@@ -13,9 +13,14 @@ const ITEMS = [
   { id: 'configuracoes', label: 'Configurações', icon: <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM3 12h2M19 12h2M12 3v2M12 19v2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4" /> },
 ];
 
+// Funções que lidam com compras e por isso recebem o botão de notificação de pedido novo.
+// Checado direto pelo nome da função (sem depender de outra lista), pra reduzir qualquer
+// chance de falha silenciosa nessa condição.
+const FUNCOES_COM_NOTIFICACAO = ['comprador', 'gerente', 'developer'];
+
 export default function Sidebar({ view, setView, role, userEmail, allowedTabs, notificacoesAtivas, onAtivarNotificacoes }) {
   const visiveis = ITEMS.filter((item) => allowedTabs.includes(item.id));
-  const gerenciaCompras = allowedTabs.includes('comprador');
+  const gerenciaCompras = FUNCOES_COM_NOTIFICACAO.includes(role);
 
   return (
     <div className="sidebar">
@@ -43,25 +48,28 @@ export default function Sidebar({ view, setView, role, userEmail, allowedTabs, n
         </button>
       ))}
 
-      {gerenciaCompras && (
-        <>
-          <div style={{ height: 1, background: 'var(--borda)', margin: '10px 4px' }} />
-          {notificacoesAtivas ? (
-            <div className="navbtn" style={{ color: 'var(--verde-escuro)', cursor: 'default' }}>
-              <svg className="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              </svg>
-              <span className="label-text">Notificações ativas</span>
-            </div>
-          ) : (
-            <button className="navbtn" onClick={onAtivarNotificacoes} title="Receber um aviso sonoro e pop-up quando chegar um pedido novo">
-              <svg className="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              </svg>
-              <span className="label-text">Ativar notificações</span>
-            </button>
-          )}
-        </>
+      <div style={{ height: 1, background: '#E3E6EA', margin: '10px 4px' }} />
+
+      {gerenciaCompras ? (
+        notificacoesAtivas ? (
+          <div className="navbtn" style={{ color: '#00622D', cursor: 'default' }}>
+            <svg className="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            <span className="label-text">Notificações ativas</span>
+          </div>
+        ) : (
+          <button className="navbtn" onClick={onAtivarNotificacoes} title="Receber um aviso sonoro e pop-up quando chegar um pedido novo">
+            <svg className="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            <span className="label-text">Ativar notificações</span>
+          </button>
+        )
+      ) : (
+        <div className="navbtn" style={{ color: '#9AA3AF', fontSize: 11, cursor: 'default' }}>
+          (sem notificação para esta função: {role || 'indefinida'})
+        </div>
       )}
 
       <div className="sidebar-foot">
