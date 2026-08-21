@@ -127,7 +127,7 @@ export default function DashboardTab({ frota, solicitacoes, config }) {
               <thead>
                 <tr>
                   <th>Data</th><th>Veículo</th><th>Peça</th><th>Qtd</th>
-                  <th>Status</th><th>Prioridade</th><th>Tempo</th>
+                  <th>Status</th><th>Última atualização</th><th>Prioridade</th><th>Tempo</th>
                 </tr>
               </thead>
               <tbody>
@@ -144,6 +144,7 @@ export default function DashboardTab({ frota, solicitacoes, config }) {
                       <td>{s.peca}</td>
                       <td>{s.quantidade}</td>
                       <td>{statusBadge(s.status)}</td>
+                      <td className="muted">{s.dataStatus ? fmtDate(s.dataStatus) : '—'}</td>
                       <td><span className={'badge ' + prioridadeBadgeClass(s.prioridade)}>{s.prioridade}</span></td>
                       <td className="muted" style={atraso ? { color: '#C0431B', fontWeight: 700 } : {}}>
                         {tempo}{atraso ? ' ⚠' : ''}
