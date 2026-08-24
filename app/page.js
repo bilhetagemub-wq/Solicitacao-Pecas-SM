@@ -10,6 +10,7 @@ import { TAB_ACCESS } from '../lib/roles';
 import {
   tocarBipAlerta, permissaoNotificacaoConcedida, solicitarPermissaoNotificacao, notificarNavegador,
 } from '../lib/notificacoes';
+import { notificarEmEstoque } from '../lib/adminApi';
 import LoginGate, { useAuthInfo } from '../components/LoginGate';
 import Sidebar from '../components/Sidebar';
 import DashboardTab from '../components/DashboardTab';
@@ -157,6 +158,15 @@ function AppInner() {
     if (novoStatus !== 'Em Estoque') patch.alertaEnviado = false;
     await updateDoc(doc(db, 'solicitacoes', id), patch);
     notify('Status atualizado: ' + novoStatus, 'ok');
+
+    if (novoStatus === 'Em Estoque') {
+      try {
+        await notificarEmEstoque(id);
+        notify('📧 E-mail avisando que a peça chegou foi enviado.', 'ok');
+      } catch (err) {
+        notify('Status salvo, mas o e-mail de aviso falhou: ' + err.message, 'err');
+      }
+    }
   };
 
   const excluirSolicitacao = async (id) => {
