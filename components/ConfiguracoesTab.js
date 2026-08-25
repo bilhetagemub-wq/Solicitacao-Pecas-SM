@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, writeBatch, doc } from 'firebase/firestore';
 import { db } from '../lib/firebaseClient';
 import { FUNCOES, FUNCAO_LABEL } from '../lib/roles';
 import { criarUsuario, atualizarFuncaoUsuario, excluirUsuario, testarEmailAlerta } from '../lib/adminApi';
 
-export default function ConfiguracoesTab({ config, onConfigChange, notify }) {
+export default function ConfiguracoesTab({ config, onConfigChange, notify, solicitacoes = [] }) {
   const [emails, setEmails] = useState(config.alertEmails || []);
   const [novoEmail, setNovoEmail] = useState('');
   const [alertaDias, setAlertaDias] = useState(config.alertaDias || 7);
@@ -17,6 +17,7 @@ export default function ConfiguracoesTab({ config, onConfigChange, notify }) {
   const [criando, setCriando] = useState(false);
   const [erroUsuario, setErroUsuario] = useState('');
   const [testandoEmail, setTestandoEmail] = useState(false);
+  const [reprocessando, setReprocessando] = useState(false);
 
   useEffect(() => { setEmails(config.alertEmails || []); }, [config.alertEmails]);
   useEffect(() => { setAlertaDias(config.alertaDias || 7); }, [config.alertaDias]);
@@ -65,6 +66,32 @@ export default function ConfiguracoesTab({ config, onConfigChange, notify }) {
       notify(err.message, 'err');
     } finally {
       setTestandoEmail(false);
+    }
+  }
+
+  async function handleReprocessarAlertas() {
+    const emAberto = solicitacoes.filter((s) => s.status !== 'Em Estoque' && s.alertaEnviado === true);
+    if (emAberto.length === 0) {
+      notify('Nenhuma peça em aberto está marcada como "já alertada" — nada para reprocessar.', 'ok');
+      return;
+    }
+    if (!confirm(
+      `${emAberto.length} peça(s) em aberto estão marcadas como já alertadas. ` +
+      'Isso vai limpar essa marcação para que o próximo alerta (diário ou manual) as reavalie. Continuar?'
+    )) return;
+
+    setReprocessando(true);
+    try {
+      const batch = writeBatch(db);
+      emAberto.forEach((s) => {
+        batch.update(doc(db, 'solicitacoes', s.id), { alertaEnviado: false });
+      });
+      await batch.commit();
+      notify(`${emAberto.length} peça(s) liberada(s) para reavaliação no próximo alerta.`, 'ok');
+    } catch (err) {
+      notify('Erro ao reprocessar: ' + err.message, 'err');
+    } finally {
+      setReprocessando(false);
     }
   }
 
@@ -142,12 +169,20 @@ export default function ConfiguracoesTab({ config, onConfigChange, notify }) {
 
       <div className="panel">
         <h2>Configurar alertas</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, marginBottom: 18 }}>
           Alertar peça pendente há mais de
           <input type="number" min="1" value={alertaDias} style={{ width: 70, textAlign: 'center' }}
             onChange={(e) => setAlertaDias(e.target.value)} onBlur={salvarAlertaDias} />
           dias
         </div>
+        <button className="btn btn-ghost" onClick={handleReprocessarAlertas} disabled={reprocessando}>
+          {reprocessando ? 'Reprocessando…' : '🔄 Reprocessar alertas de atraso'}
+        </button>
+        <p className="muted" style={{ marginTop: 8 }}>
+          Use se uma peça está atrasada mas o e-mail nunca chegou (por exemplo, depois de resolver um
+          problema no envio) — libera as peças em aberto para serem reavaliadas no próximo alerta,
+          sem precisar esperar o status mudar.
+        </p>
       </div>
 
       <div className="panel">
