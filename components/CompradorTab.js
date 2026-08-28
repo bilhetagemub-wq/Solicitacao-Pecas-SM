@@ -12,8 +12,17 @@ export default function CompradorTab({ frota, solicitacoes, config, role, onUpda
   const [busca, setBusca] = useState('');
   const [fStatus, setFStatus] = useState('');
   const [fPrio, setFPrio] = useState('');
+  const [mostrarEstoque, setMostrarEstoque] = useState(false);
+
+  const statusOpcoes = mostrarEstoque ? STATUS : STATUS.filter((s) => s !== 'Em Estoque');
+
+  function alternarMostrarEstoque(marcado) {
+    setMostrarEstoque(marcado);
+    if (!marcado && fStatus === 'Em Estoque') setFStatus('');
+  }
 
   let lista = [...solicitacoes];
+  if (!mostrarEstoque) lista = lista.filter((s) => s.status !== 'Em Estoque');
   if (fStatus) lista = lista.filter((s) => s.status === fStatus);
   if (fPrio) lista = lista.filter((s) => s.prioridade === fPrio);
   if (busca.trim()) {
@@ -49,7 +58,7 @@ export default function CompradorTab({ frota, solicitacoes, config, role, onUpda
             <label>Status</label>
             <select value={fStatus} onChange={(e) => setFStatus(e.target.value)}>
               <option value="">Todos</option>
-              {STATUS.map((s) => <option key={s} value={s}>{s}</option>)}
+              {statusOpcoes.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div className="field">
@@ -59,13 +68,23 @@ export default function CompradorTab({ frota, solicitacoes, config, role, onUpda
               {PRIORIDADES.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
+          <div className="field">
+            <label>&nbsp;</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 13.5, color: 'var(--texto)', padding: '9px 0' }}>
+              <input type="checkbox" style={{ width: 'auto' }} checked={mostrarEstoque} onChange={(e) => alternarMostrarEstoque(e.target.checked)} />
+              Mostrar já em estoque
+            </label>
+          </div>
         </div>
 
         {lista.length === 0 ? (
           <div className="empty">
             <svg className="sailicon" viewBox="0 0 100 100" fill="none"><path d="M10 90 L50 10 L90 90 Z" fill="#E7EAEE" /></svg>
             <h3>Nenhuma solicitação encontrada</h3>
-            <p>Ajuste os filtros ou aguarde novas solicitações chegarem.</p>
+            <p>
+              Ajuste os filtros ou aguarde novas solicitações chegarem.
+              {!mostrarEstoque && ' Peças já em estoque estão ocultas — marque "Mostrar já em estoque" para vê-las.'}
+            </p>
           </div>
         ) : (
           <table>
