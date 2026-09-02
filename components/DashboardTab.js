@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { daysSince, fmtDate, veiculoLabel, dentroDoPeriodo } from '../lib/utils';
+import { daysSince, fmtDate, veiculoLabel } from '../lib/utils';
 
 function Sail({ color }) {
   return (
@@ -67,15 +67,11 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
   const podeMarcarInstalada = ['encarregado', 'developer'].includes(role);
   const [filtro, setFiltro] = useState(null); // null | 'Pendente' | 'Em Cotação' | 'Em Estoque' | 'atrasadas'
   const [busca, setBusca] = useState('');
-  const [periodoInicio, setPeriodoInicio] = useState('');
-  const [periodoFim, setPeriodoFim] = useState('');
 
-  const noPeriodo = solicitacoes.filter((s) => dentroDoPeriodo(s.dataSolicitacao, periodoInicio, periodoFim));
-
-  const abertos = noPeriodo.filter((s) => s.status !== 'Em Estoque');
-  const pendentes = noPeriodo.filter((s) => s.status === 'Pendente');
-  const cotacao = noPeriodo.filter((s) => s.status === 'Em Cotação');
-  const resolvidas = noPeriodo.filter((s) => s.status === 'Em Estoque');
+  const abertos = solicitacoes.filter((s) => s.status !== 'Em Estoque');
+  const pendentes = solicitacoes.filter((s) => s.status === 'Pendente');
+  const cotacao = solicitacoes.filter((s) => s.status === 'Em Cotação');
+  const resolvidas = solicitacoes.filter((s) => s.status === 'Em Estoque');
   const alertas = abertos.filter((s) => daysSince(s.dataSolicitacao) > (config.alertaDias || 7));
 
   const tempos = resolvidas
@@ -91,12 +87,7 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
     setFiltro((atual) => (atual === valor ? null : valor));
   }
 
-  function limparPeriodo() {
-    setPeriodoInicio('');
-    setPeriodoFim('');
-  }
-
-  let lista = [...noPeriodo];
+  let lista = [...solicitacoes];
   if (filtro === 'atrasadas') {
     lista = lista.filter((s) => s.status !== 'Em Estoque' && daysSince(s.dataSolicitacao) > (config.alertaDias || 7));
   } else if (filtro) {
@@ -132,30 +123,6 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
         <div className="config-inline">
           Alertando peça pendente há mais de <strong>{config.alertaDias || 7} dia(s)</strong>
         </div>
-      </div>
-
-      <div className="panel" style={{ paddingBottom: 16 }}>
-        <div className="filters" style={{ marginBottom: 0 }}>
-          <div className="field">
-            <label>Período — de</label>
-            <input type="date" value={periodoInicio} onChange={(e) => setPeriodoInicio(e.target.value)} />
-          </div>
-          <div className="field">
-            <label>até</label>
-            <input type="date" value={periodoFim} onChange={(e) => setPeriodoFim(e.target.value)} />
-          </div>
-          {(periodoInicio || periodoFim) && (
-            <div className="field" style={{ alignSelf: 'flex-end' }}>
-              <button className="btn btn-ghost btn-sm" onClick={limparPeriodo}>Limpar período</button>
-            </div>
-          )}
-        </div>
-        {(periodoInicio || periodoFim) && (
-          <p className="muted" style={{ marginTop: 10, marginBottom: 0 }}>
-            Mostrando solicitações {periodoInicio ? `de ${periodoInicio.split('-').reverse().join('/')}` : 'desde o início'}
-            {' '}{periodoFim ? `até ${periodoFim.split('-').reverse().join('/')}` : 'até hoje'}.
-          </p>
-        )}
       </div>
 
       <div className="cards">
@@ -196,7 +163,7 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
           <div className="empty">
             <svg className="sailicon" viewBox="0 0 100 100" fill="none"><path d="M10 90 L50 10 L90 90 Z" fill="#E7EAEE" /></svg>
             <h3>Nada encontrado</h3>
-            <p>Ajuste os filtros, o período ou a busca acima.</p>
+            <p>Ajuste os filtros ou a busca acima.</p>
           </div>
         ) : (
           <>
