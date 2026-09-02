@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { daysSince, fmtDate, veiculoLabel } from '../lib/utils';
 
 function Sail({ color }) {
@@ -67,6 +67,15 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
   const podeMarcarInstalada = ['encarregado', 'developer'].includes(role);
   const [filtro, setFiltro] = useState(null); // null | 'Pendente' | 'Em Cotação' | 'Em Estoque' | 'atrasadas'
   const [busca, setBusca] = useState('');
+  const [notasAbertas, setNotasAbertas] = useState(new Set());
+
+  function alternarNota(id) {
+    setNotasAbertas((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(id)) novo.delete(id); else novo.add(id);
+      return novo;
+    });
+  }
 
   const abertos = solicitacoes.filter((s) => s.status !== 'Em Estoque');
   const pendentes = solicitacoes.filter((s) => s.status === 'Pendente');
@@ -97,7 +106,7 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
     const b = busca.toLowerCase();
     lista = lista.filter((s) => {
       const v = frota.find((f) => f.id === s.veiculoId);
-      const texto = [s.peca, v ? veiculoLabel(v) : ''].join(' ').toLowerCase();
+      const texto = [s.peca, v ? veiculoLabel(v) : '', s.matriculaEncarregado, s.observacoes].join(' ').toLowerCase();
       return texto.includes(b);
     });
   }
@@ -155,7 +164,7 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
         <div className="filters">
           <div className="field">
             <label>Buscar</label>
-            <input type="text" placeholder="Peça ou nº de frota..." value={busca} onChange={(e) => setBusca(e.target.value)} />
+            <input type="text" placeholder="Peça, nº de frota ou matrícula..." value={busca} onChange={(e) => setBusca(e.target.value)} />
           </div>
         </div>
 
@@ -170,9 +179,9 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
             <table>
               <thead>
                 <tr>
-                  <th>Data</th><th>Veículo</th><th>Peça</th><th>Qtd</th>
+                  <th>Data</th><th>Veículo</th><th>Peça</th><th>Qtd</th><th>Encarregado</th>
                   <th>Status</th><th>Última atualização</th><th>Prioridade</th><th>Tempo</th>
-                  <th>Instalada no veículo?</th>
+                  <th>Nota</th><th>Instalada no veículo?</th>
                 </tr>
               </thead>
               <tbody>
@@ -183,21 +192,40 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
                     ? 'concluído'
                     : daysSince(s.dataSolicitacao) + 'd em aberto';
                   return (
-                    <tr key={s.id} className={atraso ? 'row-alerta' : ''}>
-                      <td className="muted">{s.dataSolicitacao ? fmtDate(s.dataSolicitacao) : '—'}</td>
-                      <td><span className="veh-tag">{veiculoLabel(v)}</span></td>
-                      <td>{s.peca}</td>
-                      <td>{s.quantidade}</td>
-                      <td>{statusBadge(s.status)}</td>
-                      <td className="muted">{s.dataStatus ? fmtDate(s.dataStatus) : '—'}</td>
-                      <td><span className={'badge ' + prioridadeBadgeClass(s.prioridade)}>{s.prioridade}</span></td>
-                      <td className="muted" style={atraso ? { color: '#C0431B', fontWeight: 700 } : {}}>
-                        {tempo}{atraso ? ' ⚠' : ''}
-                      </td>
-                      <td>
-                        <ControleInstalada solicitacao={s} podeEditar={podeMarcarInstalada} onUpdateInstalada={onUpdateInstalada} />
-                      </td>
-                    </tr>
+                    <Fragment key={s.id}>
+                      <tr className={atraso ? 'row-alerta' : ''}>
+                        <td className="muted">{s.dataSolicitacao ? fmtDate(s.dataSolicitacao) : '—'}</td>
+                        <td><span className="veh-tag">{veiculoLabel(v)}</span></td>
+                        <td>{s.peca}</td>
+                        <td>{s.quantidade}</td>
+                        <td>mat. {s.matriculaEncarregado}</td>
+                        <td>{statusBadge(s.status)}</td>
+                        <td className="muted">{s.dataStatus ? fmtDate(s.dataStatus) : '—'}</td>
+                        <td><span className={'badge ' + prioridadeBadgeClass(s.prioridade)}>{s.prioridade}</span></td>
+                        <td className="muted" style={atraso ? { color: '#C0431B', fontWeight: 700 } : {}}>
+                          {tempo}{atraso ? ' ⚠' : ''}
+                        </td>
+                        <td>
+                          {s.observacoes ? (
+                            <button className="btn btn-ghost btn-sm" onClick={() => alternarNota(s.id)}>
+                              📝 {notasAbertas.has(s.id) ? 'Ocultar' : 'Ver'}
+                            </button>
+                          ) : (
+                            <span className="muted">—</span>
+                          )}
+                        </td>
+                        <td>
+                          <ControleInstalada solicitacao={s} podeEditar={podeMarcarInstalada} onUpdateInstalada={onUpdateInstalada} />
+                        </td>
+                      </tr>
+                      {notasAbertas.has(s.id) && s.observacoes && (
+                        <tr>
+                          <td colSpan={11} style={{ background: '#FAFBFC', fontSize: 13, padding: '10px 14px' }}>
+                            <strong>Observação:</strong> {s.observacoes}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
               </tbody>

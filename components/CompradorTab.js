@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { fmtDate, daysSince, veiculoLabel, STATUS, PRIORIDADES } from '../lib/utils';
 
 function prioridadeBadgeClass(p) {
@@ -13,6 +13,15 @@ export default function CompradorTab({ frota, solicitacoes, config, role, onUpda
   const [fStatus, setFStatus] = useState('');
   const [fPrio, setFPrio] = useState('');
   const [mostrarEstoque, setMostrarEstoque] = useState(false);
+  const [notasAbertas, setNotasAbertas] = useState(new Set());
+
+  function alternarNota(id) {
+    setNotasAbertas((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(id)) novo.delete(id); else novo.add(id);
+      return novo;
+    });
+  }
 
   const statusOpcoes = mostrarEstoque ? STATUS : STATUS.filter((s) => s !== 'Em Estoque');
 
@@ -29,7 +38,7 @@ export default function CompradorTab({ frota, solicitacoes, config, role, onUpda
     const b = busca.toLowerCase();
     lista = lista.filter((s) => {
       const v = frota.find((f) => f.id === s.veiculoId);
-      const texto = [s.peca, s.matriculaSolicitante, s.matriculaEncarregado, v ? veiculoLabel(v) : ''].join(' ').toLowerCase();
+      const texto = [s.peca, s.matriculaSolicitante, s.matriculaEncarregado, v ? veiculoLabel(v) : '', s.observacoes].join(' ').toLowerCase();
       return texto.includes(b);
     });
   }
@@ -91,7 +100,7 @@ export default function CompradorTab({ frota, solicitacoes, config, role, onUpda
             <thead>
               <tr>
                 <th>Data</th><th>Veículo</th><th>Peça</th><th>Qtd</th><th>Solicitante</th><th>Encarregado</th>
-                <th>Status</th><th>Prioridade</th><th>Tempo</th>{podeExcluir && <th></th>}
+                <th>Status</th><th>Prioridade</th><th>Tempo</th><th>Nota</th>{podeExcluir && <th></th>}
               </tr>
             </thead>
             <tbody>
@@ -103,36 +112,54 @@ export default function CompradorTab({ frota, solicitacoes, config, role, onUpda
                       (s.dataSolicitacao?.toDate ? s.dataSolicitacao.toDate() : new Date(s.dataSolicitacao))) / 86400000) + 'd (concluído)'
                   : daysSince(s.dataSolicitacao) + 'd em aberto';
                 return (
-                  <tr key={s.id} className={atraso ? 'row-alerta' : ''}>
-                    <td className="muted">{s.dataSolicitacao ? fmtDate(s.dataSolicitacao) : '—'}</td>
-                    <td><span className="veh-tag">{veiculoLabel(v)}</span></td>
-                    <td>{s.peca}</td>
-                    <td>{s.quantidade}</td>
-                    <td>mat. {s.matriculaSolicitante}</td>
-                    <td>mat. {s.matriculaEncarregado}</td>
-                    <td>
-                      <select
-                        value={s.status}
-                        className={'status-' + (s.status === 'Pendente' ? 'pendente' : s.status === 'Em Cotação' ? 'cotacao' : 'estoque')}
-                        onChange={(e) => onUpdateStatus(s.id, e.target.value)}
-                      >
-                        {STATUS.map((st) => <option key={st} value={st}>{st}</option>)}
-                      </select>
-                    </td>
-                    <td>
-                      <span className={'badge ' + prioridadeBadgeClass(s.prioridade)}>{s.prioridade}</span>
-                    </td>
-                    <td className="muted" style={atraso ? { color: '#C0431B', fontWeight: 700 } : {}}>
-                      {diasAberto}{atraso ? ' ⚠' : ''}
-                    </td>
-                    {podeExcluir && (
+                  <Fragment key={s.id}>
+                    <tr className={atraso ? 'row-alerta' : ''}>
+                      <td className="muted">{s.dataSolicitacao ? fmtDate(s.dataSolicitacao) : '—'}</td>
+                      <td><span className="veh-tag">{veiculoLabel(v)}</span></td>
+                      <td>{s.peca}</td>
+                      <td>{s.quantidade}</td>
+                      <td>mat. {s.matriculaSolicitante}</td>
+                      <td>mat. {s.matriculaEncarregado}</td>
                       <td>
-                        <button className="btn btn-sm btn-danger-ghost" onClick={() => { if (confirm('Excluir esta solicitação? Essa ação não pode ser desfeita.')) onDelete(s.id); }}>
-                          Excluir
-                        </button>
+                        <select
+                          value={s.status}
+                          className={'status-' + (s.status === 'Pendente' ? 'pendente' : s.status === 'Em Cotação' ? 'cotacao' : 'estoque')}
+                          onChange={(e) => onUpdateStatus(s.id, e.target.value)}
+                        >
+                          {STATUS.map((st) => <option key={st} value={st}>{st}</option>)}
+                        </select>
                       </td>
+                      <td>
+                        <span className={'badge ' + prioridadeBadgeClass(s.prioridade)}>{s.prioridade}</span>
+                      </td>
+                      <td className="muted" style={atraso ? { color: '#C0431B', fontWeight: 700 } : {}}>
+                        {diasAberto}{atraso ? ' ⚠' : ''}
+                      </td>
+                      <td>
+                        {s.observacoes ? (
+                          <button className="btn btn-ghost btn-sm" onClick={() => alternarNota(s.id)}>
+                            📝 {notasAbertas.has(s.id) ? 'Ocultar' : 'Ver'}
+                          </button>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
+                      {podeExcluir && (
+                        <td>
+                          <button className="btn btn-sm btn-danger-ghost" onClick={() => { if (confirm('Excluir esta solicitação? Essa ação não pode ser desfeita.')) onDelete(s.id); }}>
+                            Excluir
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                    {notasAbertas.has(s.id) && s.observacoes && (
+                      <tr>
+                        <td colSpan={podeExcluir ? 10 : 9} style={{ background: '#FAFBFC', fontSize: 13, padding: '10px 14px' }}>
+                          <strong>Observação:</strong> {s.observacoes}
+                        </td>
+                      </tr>
                     )}
-                  </tr>
+                  </Fragment>
                 );
               })}
             </tbody>
