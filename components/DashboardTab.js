@@ -67,6 +67,7 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
   const podeMarcarInstalada = ['encarregado', 'developer'].includes(role);
   const [filtro, setFiltro] = useState(null); // null | 'Pendente' | 'Em Cotação' | 'Em Estoque' | 'atrasadas'
   const [busca, setBusca] = useState('');
+  const [mostrarRespondidas, setMostrarRespondidas] = useState(false);
   const [notasAbertas, setNotasAbertas] = useState(new Set());
 
   function alternarNota(id) {
@@ -97,6 +98,9 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
   }
 
   let lista = [...solicitacoes];
+  if (!mostrarRespondidas) {
+    lista = lista.filter((s) => !(s.status === 'Em Estoque' && (s.instalada === true || s.instalada === false)));
+  }
   if (filtro === 'atrasadas') {
     lista = lista.filter((s) => s.status !== 'Em Estoque' && daysSince(s.dataSolicitacao) > (config.alertaDias || 7));
   } else if (filtro) {
@@ -166,13 +170,23 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
             <label>Buscar</label>
             <input type="text" placeholder="Peça, nº de frota ou matrícula..." value={busca} onChange={(e) => setBusca(e.target.value)} />
           </div>
+          <div className="field">
+            <label>&nbsp;</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 13.5, color: 'var(--texto)', padding: '9px 0' }}>
+              <input type="checkbox" style={{ width: 'auto' }} checked={mostrarRespondidas} onChange={(e) => setMostrarRespondidas(e.target.checked)} />
+              Mostrar peças já respondidas (instalada)
+            </label>
+          </div>
         </div>
 
         {lista.length === 0 ? (
           <div className="empty">
             <svg className="sailicon" viewBox="0 0 100 100" fill="none"><path d="M10 90 L50 10 L90 90 Z" fill="#E7EAEE" /></svg>
             <h3>Nada encontrado</h3>
-            <p>Ajuste os filtros ou a busca acima.</p>
+            <p>
+              Ajuste os filtros ou a busca acima.
+              {!mostrarRespondidas && ' Peças já respondidas (instalada) estão ocultas por padrão.'}
+            </p>
           </div>
         ) : (
           <>

@@ -162,8 +162,10 @@ function AppInner() {
 
     if (novoStatus === 'Em Estoque') {
       try {
-        await notificarEmEstoque(id);
-        notify('📧 E-mail avisando que a peça chegou foi enviado.', 'ok');
+        const resultado = await notificarEmEstoque(id);
+        if (!resultado.skipped) {
+          notify('📧 E-mail avisando que a peça chegou foi enviado.', 'ok');
+        }
       } catch (err) {
         notify('Status salvo, mas o e-mail de aviso falhou: ' + err.message, 'err');
       }

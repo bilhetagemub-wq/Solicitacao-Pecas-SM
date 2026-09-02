@@ -10,6 +10,8 @@ export default function ConfiguracoesTab({ config, onConfigChange, notify, solic
   const [emails, setEmails] = useState(config.alertEmails || []);
   const [novoEmail, setNovoEmail] = useState('');
   const [alertaDias, setAlertaDias] = useState(config.alertaDias || 7);
+  const [alertasAtivos, setAlertasAtivos] = useState(config.alertasAtivos || { atraso: true, emEstoque: true });
+  const [horario, setHorario] = useState(config.horarioAlertaDiario || '09:00');
 
   const [usuarios, setUsuarios] = useState([]);
   const [carregandoUsuarios, setCarregandoUsuarios] = useState(true);
@@ -21,6 +23,8 @@ export default function ConfiguracoesTab({ config, onConfigChange, notify, solic
 
   useEffect(() => { setEmails(config.alertEmails || []); }, [config.alertEmails]);
   useEffect(() => { setAlertaDias(config.alertaDias || 7); }, [config.alertaDias]);
+  useEffect(() => { setAlertasAtivos(config.alertasAtivos || { atraso: true, emEstoque: true }); }, [config.alertasAtivos]);
+  useEffect(() => { setHorario(config.horarioAlertaDiario || '09:00'); }, [config.horarioAlertaDiario]);
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -54,6 +58,26 @@ export default function ConfiguracoesTab({ config, onConfigChange, notify, solic
   function salvarAlertaDias() {
     const v = parseInt(alertaDias, 10);
     onConfigChange({ alertaDias: isNaN(v) || v < 1 ? 7 : v });
+  }
+
+  function alternarAlerta(tipo) {
+    const novo = { ...alertasAtivos, [tipo]: !alertasAtivos[tipo] };
+    setAlertasAtivos(novo);
+    onConfigChange({ alertasAtivos: novo });
+  }
+
+  function salvarHorario(novoHorario) {
+    setHorario(novoHorario);
+    onConfigChange({ horarioAlertaDiario: novoHorario });
+  }
+
+  function cronEquivalente(horarioBrasilia) {
+    const [hStr, mStr] = horarioBrasilia.split(':');
+    const h = parseInt(hStr, 10);
+    const m = parseInt(mStr, 10);
+    if (isNaN(h) || isNaN(m)) return '0 12 * * *';
+    const hUTC = (h + 3) % 24; // Brasília = UTC-3
+    return `${m} ${hUTC} * * *`;
   }
 
   async function handleTestarEmail() {
@@ -164,6 +188,49 @@ export default function ConfiguracoesTab({ config, onConfigChange, notify, solic
         </button>
         <p className="muted" style={{ marginTop: 8 }}>
           Envia uma mensagem de teste para os e-mails cadastrados acima, sem esperar o alerta automático diário.
+        </p>
+      </div>
+
+      <div className="panel">
+        <h2>Ativar / desativar alertas</h2>
+        <p className="muted" style={{ margin: '0 0 14px' }}>
+          Desligue aqui qualquer tipo de alerta por e-mail sem precisar mexer em código.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}>
+            <input type="checkbox" style={{ width: 'auto' }} checked={alertasAtivos.atraso !== false} onChange={() => alternarAlerta('atraso')} />
+            <span><strong>Alerta de peça atrasada</strong> — resumo diário automático (cron)</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}>
+            <input type="checkbox" style={{ width: 'auto' }} checked={alertasAtivos.emEstoque !== false} onChange={() => alternarAlerta('emEstoque')} />
+            <span><strong>Alerta de peça em estoque</strong> — e-mail imediato quando o status muda</span>
+          </label>
+        </div>
+        <p className="muted" style={{ marginTop: 14 }}>
+          Desativado aqui, o sistema simplesmente não envia aquele tipo de e-mail — o resto continua
+          funcionando normalmente (status, dashboard, etc). Pode reativar a qualquer momento.
+        </p>
+      </div>
+
+      <div className="panel">
+        <h2>Horário do alerta diário</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, marginBottom: 14 }}>
+          Enviar o resumo diário de peças atrasadas às
+          <input type="time" value={horario} style={{ width: 120 }} onChange={(e) => salvarHorario(e.target.value)} />
+          (horário de Brasília)
+        </div>
+        <p className="muted" style={{ marginBottom: 6 }}>
+          ⚠️ <strong>Importante:</strong> este campo é só uma referência salva no sistema — quem
+          realmente decide a hora que o alerta roda é o Vercel Cron, configurado no arquivo{' '}
+          <code>vercel.json</code> do projeto, que só muda com um novo deploy (o Vercel não permite
+          trocar isso em tempo real pelo site). Depois de escolher o horário acima, edite o campo{' '}
+          <code>"schedule"</code> em <code>vercel.json</code> para o valor abaixo e faça o redeploy:
+        </p>
+        <code style={{ display: 'block', background: '#F5F6F8', padding: '10px 14px', borderRadius: 8, fontSize: 13 }}>
+          "{cronEquivalente(horario)}"
+        </code>
+        <p className="muted" style={{ marginTop: 8 }}>
+          (já convertido de {horario} horário de Brasília para UTC, que é o fuso que o Vercel usa)
         </p>
       </div>
 

@@ -11,12 +11,11 @@ function getCampo(row, chaves) {
   return '';
 }
 
-function baixarModelo() {
-  const wsData = [
-    ['Nº Frota', 'Fabricante', 'Ano'],
-    ['1234', 'Marcopolo', '2020'],
-    ['5678', 'Caio', '2019'],
-  ];
+function baixarModelo(frota) {
+  const linhas = frota.length > 0
+    ? frota.map((v) => [v.numeroFrota, v.fabricante, v.ano || ''])
+    : [['1234', 'Marcopolo', '2020'], ['5678', 'Caio', '2019']];
+  const wsData = [['Nº Frota', 'Fabricante', 'Ano'], ...linhas];
   const ws = XLSX.utils.aoa_to_sheet(wsData);
   ws['!cols'] = [{ wch: 14 }, { wch: 16 }, { wch: 10 }];
   const wb = XLSX.utils.book_new();
@@ -77,14 +76,16 @@ export default function AtualizacoesTab({ frota, solicitacoes, onUpsertLote, onR
       <div className="panel">
         <h2>1. Baixe o modelo de planilha</h2>
         <p className="muted" style={{ margin: '0 0 14px' }}>
-          Preencha o modelo com a relação atual de veículos e depois envie o arquivo no passo 2.
-          Colunas aceitas: <strong>Nº Frota</strong> (obrigatória), <strong>Fabricante</strong> (Marcopolo ou Caio) e <strong>Ano</strong>.
+          {frota.length > 0
+            ? 'O arquivo já vem preenchido com os veículos atualmente cadastrados no sistema — edite o que precisar e envie de volta no passo 2.'
+            : 'Preencha o modelo com a relação atual de veículos e depois envie o arquivo no passo 2.'}
+          {' '}Colunas aceitas: <strong>Nº Frota</strong> (obrigatória), <strong>Fabricante</strong> (Marcopolo ou Caio) e <strong>Ano</strong>.
         </p>
-        <button className="btn btn-ghost" onClick={baixarModelo}>
+        <button className="btn btn-ghost" onClick={() => baixarModelo(frota)}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" />
           </svg>
-          Baixar modelo (.xlsx)
+          {frota.length > 0 ? 'Baixar planilha atual (.xlsx)' : 'Baixar modelo (.xlsx)'}
         </button>
       </div>
 

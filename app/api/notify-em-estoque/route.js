@@ -31,6 +31,12 @@ export async function POST(request) {
     }
 
     const configSnap = await db.collection('config').doc('geral').get();
+
+    const alertasAtivos = configSnap.exists ? (configSnap.data().alertasAtivos || {}) : {};
+    if (alertasAtivos.emEstoque === false) {
+      return NextResponse.json({ ok: true, skipped: true, message: 'Alerta de peça em estoque está desativado na aba Configurações.' });
+    }
+
     const toEmails = (configSnap.exists && Array.isArray(configSnap.data().alertEmails) && configSnap.data().alertEmails.length)
       ? configSnap.data().alertEmails
       : (process.env.ALERT_TO_EMAILS || '').split(',').map((e) => e.trim()).filter(Boolean);

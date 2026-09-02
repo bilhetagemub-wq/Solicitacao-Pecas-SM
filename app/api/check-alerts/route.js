@@ -22,6 +22,11 @@ export async function GET(request) {
     const configSnap = await db.collection('config').doc('geral').get();
     const alertaDias = configSnap.exists ? (configSnap.data().alertaDias || 7) : 7;
 
+    const alertasAtivos = configSnap.exists ? (configSnap.data().alertasAtivos || {}) : {};
+    if (alertasAtivos.atraso === false) {
+      return NextResponse.json({ ok: true, skipped: true, message: 'Alerta de peça atrasada está desativado na aba Configurações.' });
+    }
+
     const frotaSnap = await db.collection('frota').get();
     const frotaMap = {};
     frotaSnap.forEach((d) => { frotaMap[d.id] = d.data(); });
