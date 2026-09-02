@@ -18,6 +18,13 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
     return db_ - da;
   });
 
+  function textoInstalada(s) {
+    if (s.status !== 'Em Estoque') return '';
+    if (s.instalada === true) return 'Sim';
+    if (s.instalada === false) return 'Não';
+    return 'Aguardando confirmação';
+  }
+
   function montarLinha(s) {
     const v = frota.find((f) => f.id === s.veiculoId);
     const atrasada = s.status !== 'Em Estoque' && daysSince(s.dataSolicitacao) > (config.alertaDias || 7);
@@ -29,6 +36,7 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
       'Peça': s.peca,
       'Quantidade': s.quantidade,
       'Status': s.status,
+      'Instalada no Veículo': textoInstalada(s),
       'Prioridade': s.prioridade,
       'Matrícula Solicitante': s.matriculaSolicitante,
       'Matrícula Encarregado': s.matriculaEncarregado,
@@ -42,8 +50,8 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
     const linhas = lista.map(montarLinha);
     const ws = XLSX.utils.json_to_sheet(linhas);
     ws['!cols'] = [
-      { wch: 17 }, { wch: 9 }, { wch: 12 }, { wch: 7 }, { wch: 26 }, { wch: 10 },
-      { wch: 12 }, { wch: 11 }, { wch: 18 }, { wch: 18 }, { wch: 13 }, { wch: 10 }, { wch: 30 },
+      { wch: 17 }, { wch: 9 }, { wch: 12 }, { wch: 7 }, { wch: 26 }, { wch: 10 }, { wch: 12 },
+      { wch: 18 }, { wch: 11 }, { wch: 18 }, { wch: 18 }, { wch: 13 }, { wch: 10 }, { wch: 30 },
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Peças');
@@ -84,7 +92,7 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
         ) : (
           <>
             <table>
-              <thead><tr><th>Data</th><th>Veículo</th><th>Peça</th><th>Qtd</th><th>Status</th><th>Prioridade</th><th>Tempo</th></tr></thead>
+              <thead><tr><th>Data</th><th>Veículo</th><th>Peça</th><th>Qtd</th><th>Status</th><th>Instalada</th><th>Prioridade</th><th>Tempo</th></tr></thead>
               <tbody>
                 {lista.slice(0, 50).map((s) => {
                   const v = frota.find((f) => f.id === s.veiculoId);
@@ -96,6 +104,7 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
                       <td>{s.peca}</td>
                       <td>{s.quantidade}</td>
                       <td>{s.status}</td>
+                      <td className="muted">{textoInstalada(s) || '—'}</td>
                       <td>{s.prioridade}</td>
                       <td>{s.status !== 'Em Estoque' ? daysSince(s.dataSolicitacao) + 'd' : '—'}</td>
                     </tr>

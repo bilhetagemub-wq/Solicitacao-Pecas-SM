@@ -1,0 +1,60 @@
+rules_version = '2';
+
+// Regras baseadas em função de usuário (Firebase Authentication + coleção "usuarios").
+// Cada usuário autenticado tem um documento em /usuarios/{uid} com um campo "role":
+// "comprador" | "encarregado" | "gerente" | "developer".
+//
+// Isso é proteção de verdade: sem estar logado e sem a função correta, a leitura/escrita
+// é recusada diretamente pelo Firestore, e não apenas escondida na interface.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function logado() {
+      return request.auth != null;
+    }
+
+    function minhaFuncao() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role;
+    }
+
+    // --- usuários (usado para descobrir a função de quem está logado) ---
+    match /usuarios/{uid} {
+      allow read: if logado() && (request.auth.uid == uid || minhaFuncao() == 'developer');
+      // Criação/edição/exclusão de usuários é feita pelas rotas de API (Admin SDK),
+      // que já verificam a função Developer no servidor. Aqui bloqueamos escrita direta
+      // do cliente por segurança extra.
+      allow write: if false;
+    }
+
+    // --- frota: leitura para todos os logados; edição só Gerente/Developer ---
+    match /frota/{docId} {
+      allow read: if logado();
+      allow write: if logado() && minhaFuncao() in ['gerente', 'developer'];
+    }
+
+    // --- solicitações ---
+    match /solicitacoes/{docId} {
+      allow read: if logado();
+      allow create: if logado() && minhaFuncao() in ['encarregado', 'gerente', 'developer'];
+      allow delete: if logado() && minhaFuncao() in ['encarregado', 'gerente', 'developer'];
+
+      // Comprador pode atualizar status, mas NÃO pode alterar a prioridade —
+      // ela é definida pelo solicitante no momento do pedido e não muda depois.
+      // Encarregado só pode marcar se a peça foi instalada no veículo (nada além disso).
+      // Gerente e Developer podem alterar qualquer campo.
+      allow update: if logado() && (
+        minhaFuncao() in ['gerente', 'developer'] ||
+        (minhaFuncao() == 'comprador' && request.resource.data.prioridade == resource.data.prioridade) ||
+        (minhaFuncao() == 'encarregado' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['instalada', 'dataInstalada']))
+      );
+    }
+
+    // --- configuração geral (prazo de alerta, e-mails de alerta) ---
+    match /config/{docId} {
+      allow read: if logado();
+      allow write: if logado() && minhaFuncao() == 'developer';
+    }
+  }
+}

@@ -20,7 +20,51 @@ function prioridadeBadgeClass(p) {
   return p === 'Alta' ? 'badge-alta' : p === 'Média' ? 'badge-media' : 'badge-baixa';
 }
 
-export default function DashboardTab({ frota, solicitacoes, config }) {
+function ControleInstalada({ solicitacao, podeEditar, onUpdateInstalada }) {
+  if (solicitacao.status !== 'Em Estoque') {
+    return <span className="muted">—</span>;
+  }
+
+  const valor = solicitacao.instalada;
+  const definido = valor === true || valor === false;
+
+  if (!podeEditar) {
+    if (!definido) return <span className="muted">Aguardando confirmação</span>;
+    return valor
+      ? <span className="badge badge-estoque">✓ Instalada</span>
+      : <span className="badge badge-alta">✗ Não instalada</span>;
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <button
+        className="btn btn-sm"
+        style={{
+          background: valor === true ? '#00843D' : '#fff',
+          color: valor === true ? '#fff' : 'var(--texto)',
+          border: '1px solid ' + (valor === true ? '#00843D' : 'var(--borda)'),
+        }}
+        onClick={() => onUpdateInstalada(solicitacao.id, true)}
+      >
+        Sim
+      </button>
+      <button
+        className="btn btn-sm"
+        style={{
+          background: valor === false ? '#E4242B' : '#fff',
+          color: valor === false ? '#fff' : 'var(--texto)',
+          border: '1px solid ' + (valor === false ? '#E4242B' : 'var(--borda)'),
+        }}
+        onClick={() => onUpdateInstalada(solicitacao.id, false)}
+      >
+        Não
+      </button>
+    </div>
+  );
+}
+
+export default function DashboardTab({ frota, solicitacoes, config, role, onUpdateInstalada }) {
+  const podeMarcarInstalada = ['encarregado', 'developer'].includes(role);
   const [filtro, setFiltro] = useState(null); // null | 'Pendente' | 'Em Cotação' | 'Em Estoque' | 'atrasadas'
   const [busca, setBusca] = useState('');
 
@@ -128,6 +172,7 @@ export default function DashboardTab({ frota, solicitacoes, config }) {
                 <tr>
                   <th>Data</th><th>Veículo</th><th>Peça</th><th>Qtd</th>
                   <th>Status</th><th>Última atualização</th><th>Prioridade</th><th>Tempo</th>
+                  <th>Instalada no veículo?</th>
                 </tr>
               </thead>
               <tbody>
@@ -148,6 +193,9 @@ export default function DashboardTab({ frota, solicitacoes, config }) {
                       <td><span className={'badge ' + prioridadeBadgeClass(s.prioridade)}>{s.prioridade}</span></td>
                       <td className="muted" style={atraso ? { color: '#C0431B', fontWeight: 700 } : {}}>
                         {tempo}{atraso ? ' ⚠' : ''}
+                      </td>
+                      <td>
+                        <ControleInstalada solicitacao={s} podeEditar={podeMarcarInstalada} onUpdateInstalada={onUpdateInstalada} />
                       </td>
                     </tr>
                   );

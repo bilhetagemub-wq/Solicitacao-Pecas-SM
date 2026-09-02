@@ -144,6 +144,7 @@ function AppInner() {
       dataStatus: serverTimestamp(),
       dataResolucao: null,
       alertaEnviado: false,
+      instalada: null,
     });
     notify('Solicitação enviada com sucesso!', 'ok');
     return { id: ref.id };
@@ -167,6 +168,11 @@ function AppInner() {
         notify('Status salvo, mas o e-mail de aviso falhou: ' + err.message, 'err');
       }
     }
+  };
+
+  const atualizarInstalada = async (id, valor) => {
+    await updateDoc(doc(db, 'solicitacoes', id), { instalada: valor, dataInstalada: serverTimestamp() });
+    notify(valor ? 'Marcado: peça instalada no veículo.' : 'Marcado: peça não instalada no veículo.', 'ok');
   };
 
   const excluirSolicitacao = async (id) => {
@@ -197,7 +203,7 @@ function AppInner() {
           ) : (
             <>
               {view === 'dashboard' && allowedTabs.includes('dashboard') && (
-                <DashboardTab frota={frota} solicitacoes={solicitacoes} config={config} />
+                <DashboardTab frota={frota} solicitacoes={solicitacoes} config={config} role={role} onUpdateInstalada={atualizarInstalada} />
               )}
               {view === 'solicitacao' && allowedTabs.includes('solicitacao') && (
                 <SolicitarTab frota={frota} solicitacoes={solicitacoes} onSubmit={criarSolicitacao} onDelete={excluirSolicitacao} />
@@ -219,7 +225,7 @@ function AppInner() {
                 <RelatorioTab frota={frota} solicitacoes={solicitacoes} config={config} />
               )}
               {view === 'configuracoes' && allowedTabs.includes('configuracoes') && (
-                <ConfiguracoesTab config={config} onConfigChange={atualizarConfig} notify={notify} />
+                <ConfiguracoesTab config={config} onConfigChange={atualizarConfig} notify={notify} solicitacoes={solicitacoes} />
               )}
             </>
           )}
