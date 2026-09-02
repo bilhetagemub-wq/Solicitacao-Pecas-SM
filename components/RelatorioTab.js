@@ -2,21 +2,31 @@
 
 import { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { daysSince, fmtDate, veiculoLabel } from '../lib/utils';
+import { daysSince, fmtDate, veiculoLabel, dentroDoPeriodo } from '../lib/utils';
 
 export default function RelatorioTab({ frota, solicitacoes, config }) {
   const [incluirResolvidas, setIncluirResolvidas] = useState(false);
   const [somenteAtrasadas, setSomenteAtrasadas] = useState(false);
+  const [periodoInicio, setPeriodoInicio] = useState('');
+  const [periodoFim, setPeriodoFim] = useState('');
 
   let lista = solicitacoes.filter((s) => incluirResolvidas || s.status !== 'Em Estoque');
   if (somenteAtrasadas) {
     lista = lista.filter((s) => s.status !== 'Em Estoque' && daysSince(s.dataSolicitacao) > (config.alertaDias || 7));
+  }
+  if (periodoInicio || periodoFim) {
+    lista = lista.filter((s) => dentroDoPeriodo(s.dataSolicitacao, periodoInicio, periodoFim));
   }
   lista = [...lista].sort((a, b) => {
     const da = a.dataSolicitacao?.toDate ? a.dataSolicitacao.toDate() : new Date(a.dataSolicitacao || 0);
     const db_ = b.dataSolicitacao?.toDate ? b.dataSolicitacao.toDate() : new Date(b.dataSolicitacao || 0);
     return db_ - da;
   });
+
+  function limparPeriodo() {
+    setPeriodoInicio('');
+    setPeriodoFim('');
+  }
 
   function textoInstalada(s) {
     if (s.status !== 'Em Estoque') return '';
@@ -70,6 +80,21 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
 
       <div className="panel">
         <div className="filters">
+          <div className="field">
+            <label>Período — de</label>
+            <input type="date" value={periodoInicio} onChange={(e) => setPeriodoInicio(e.target.value)} />
+          </div>
+          <div className="field">
+            <label>até</label>
+            <input type="date" value={periodoFim} onChange={(e) => setPeriodoFim(e.target.value)} />
+          </div>
+          {(periodoInicio || periodoFim) && (
+            <div className="field" style={{ alignSelf: 'flex-end' }}>
+              <button className="btn btn-ghost btn-sm" onClick={limparPeriodo}>Limpar período</button>
+            </div>
+          )}
+        </div>
+        <div className="filters">
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 13.5, color: 'var(--texto)' }}>
             <input type="checkbox" style={{ width: 'auto' }} checked={incluirResolvidas} onChange={(e) => setIncluirResolvidas(e.target.checked)} />
             Incluir peças já em estoque (resolvidas)
@@ -88,7 +113,7 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
       <div className="panel">
         <h2>Pré-visualização</h2>
         {lista.length === 0 ? (
-          <div className="empty"><h3>Nada para mostrar com esse filtro</h3><p>Ajuste os filtros acima.</p></div>
+          <div className="empty"><h3>Nada para mostrar com esse filtro</h3><p>Ajuste os filtros ou o período acima.</p></div>
         ) : (
           <>
             <table>
