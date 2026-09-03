@@ -98,8 +98,9 @@ function ModalMotivo({ onCancelar, onConfirmar }) {
   );
 }
 
-export default function DashboardTab({ frota, solicitacoes, config, role, onUpdateInstalada }) {
+export default function DashboardTab({ frota, solicitacoes, config, role, onUpdateInstalada, onDelete }) {
   const podeMarcarInstalada = ['encarregado', 'developer'].includes(role);
+  const podeExcluir = role === 'developer';
   const [filtro, setFiltro] = useState(null); // null | 'Pendente' | 'Em Cotação' | 'Em Estoque' | 'Instalada' | 'atrasadas'
   const [busca, setBusca] = useState('');
   const [notasAbertas, setNotasAbertas] = useState(new Set());
@@ -241,7 +242,7 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
                 <tr>
                   <th>Data</th><th>Veículo</th><th>Peça</th><th>Qtd</th><th>Encarregado</th>
                   <th>Status</th><th>Última atualização</th><th>Prioridade</th><th>Tempo</th>
-                  <th>Nota</th><th>Instalada no veículo?</th>
+                  <th>Nota</th><th>Instalada no veículo?</th>{podeExcluir && <th></th>}
                 </tr>
               </thead>
               <tbody>
@@ -283,10 +284,20 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
                             onPedirMotivo={setModalMotivoId}
                           />
                         </td>
+                        {podeExcluir && (
+                          <td>
+                            <button
+                              className="btn btn-sm btn-danger-ghost"
+                              onClick={() => { if (confirm('Excluir esta solicitação? Essa ação não pode ser desfeita.')) onDelete(s.id); }}
+                            >
+                              Excluir
+                            </button>
+                          </td>
+                        )}
                       </tr>
                       {notasAbertas.has(s.id) && temNota && (
                         <tr>
-                          <td colSpan={11} style={{ background: '#FAFBFC', fontSize: 13, padding: '10px 14px' }}>
+                          <td colSpan={podeExcluir ? 12 : 11} style={{ background: '#FAFBFC', fontSize: 13, padding: '10px 14px' }}>
                             {s.observacoes && <div><strong>Observação:</strong> {s.observacoes}</div>}
                             {s.motivoNaoInstalada && (
                               <div style={{ marginTop: s.observacoes ? 6 : 0 }}>

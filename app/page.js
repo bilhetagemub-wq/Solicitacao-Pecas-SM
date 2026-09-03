@@ -207,7 +207,7 @@ function AppInner() {
           ) : (
             <>
               {view === 'dashboard' && allowedTabs.includes('dashboard') && (
-                <DashboardTab frota={frota} solicitacoes={solicitacoes} config={config} role={role} onUpdateInstalada={atualizarInstalada} />
+                <DashboardTab frota={frota} solicitacoes={solicitacoes} config={config} role={role} onUpdateInstalada={atualizarInstalada} onDelete={excluirSolicitacao} />
               )}
               {view === 'solicitacao' && allowedTabs.includes('solicitacao') && (
                 <SolicitarTab frota={frota} solicitacoes={solicitacoes} onSubmit={criarSolicitacao} onDelete={excluirSolicitacao} />
