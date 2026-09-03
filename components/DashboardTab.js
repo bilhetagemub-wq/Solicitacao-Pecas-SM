@@ -20,7 +20,7 @@ function prioridadeBadgeClass(p) {
   return p === 'Alta' ? 'badge-alta' : p === 'Média' ? 'badge-media' : 'badge-baixa';
 }
 
-function ControleInstalada({ solicitacao, podeEditar, onUpdateInstalada }) {
+function ControleInstalada({ solicitacao, podeEditar, onUpdateInstalada, onPedirMotivo }) {
   if (solicitacao.status !== 'Em Estoque') {
     return <span className="muted">—</span>;
   }
@@ -55,7 +55,7 @@ function ControleInstalada({ solicitacao, podeEditar, onUpdateInstalada }) {
           color: valor === false ? '#fff' : 'var(--texto)',
           border: '1px solid ' + (valor === false ? '#E4242B' : 'var(--borda)'),
         }}
-        onClick={() => onUpdateInstalada(solicitacao.id, false)}
+        onClick={() => onPedirMotivo(solicitacao.id)}
       >
         Não
       </button>
@@ -63,12 +63,47 @@ function ControleInstalada({ solicitacao, podeEditar, onUpdateInstalada }) {
   );
 }
 
+function ModalMotivo({ onCancelar, onConfirmar }) {
+  const [texto, setTexto] = useState('');
+  const [erro, setErro] = useState('');
+
+  function confirmar() {
+    if (!texto.trim()) { setErro('Escreva o motivo antes de confirmar.'); return; }
+    onConfirmar(texto.trim());
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onCancelar}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <h3 style={{ margin: '0 0 6px', fontSize: 16 }}>Por que a peça não foi instalada?</h3>
+        <p className="muted" style={{ marginBottom: 14 }}>
+          Esse motivo fica salvo com a solicitação e aparece no Relatório.
+        </p>
+        <div className="field">
+          <textarea
+            rows="3"
+            autoFocus
+            placeholder="Ex: peça errada, veículo já saiu de manutenção, aguardando outra peça complementar..."
+            value={texto}
+            onChange={(e) => { setTexto(e.target.value); setErro(''); }}
+          />
+        </div>
+        {erro && <p style={{ color: 'var(--vermelho)', fontSize: 12.5, marginBottom: 10 }}>{erro}</p>}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button className="btn btn-ghost" onClick={onCancelar}>Cancelar</button>
+          <button className="btn btn-primary" onClick={confirmar}>Confirmar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardTab({ frota, solicitacoes, config, role, onUpdateInstalada }) {
   const podeMarcarInstalada = ['encarregado', 'developer'].includes(role);
-  const [filtro, setFiltro] = useState(null); // null | 'Pendente' | 'Em Cotação' | 'Em Estoque' | 'atrasadas'
+  const [filtro, setFiltro] = useState(null); // null | 'Pendente' | 'Em Cotação' | 'Em Estoque' | 'Instalada' | 'atrasadas'
   const [busca, setBusca] = useState('');
-  const [mostrarRespondidas, setMostrarRespondidas] = useState(false);
   const [notasAbertas, setNotasAbertas] = useState(new Set());
+  const [modalMotivoId, setModalMotivoId] = useState(null);
 
   function alternarNota(id) {
     setNotasAbertas((atual) => {
@@ -81,10 +116,12 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
   const abertos = solicitacoes.filter((s) => s.status !== 'Em Estoque');
   const pendentes = solicitacoes.filter((s) => s.status === 'Pendente');
   const cotacao = solicitacoes.filter((s) => s.status === 'Em Cotação');
-  const resolvidas = solicitacoes.filter((s) => s.status === 'Em Estoque');
+  const todasEmEstoque = solicitacoes.filter((s) => s.status === 'Em Estoque');
+  const emEstoqueAguardando = todasEmEstoque.filter((s) => s.instalada !== true); // ainda não foi pro veículo
+  const instaladas = todasEmEstoque.filter((s) => s.instalada === true); // já foi pro veículo
   const alertas = abertos.filter((s) => daysSince(s.dataSolicitacao) > (config.alertaDias || 7));
 
-  const tempos = resolvidas
+  const tempos = todasEmEstoque
     .filter((s) => s.dataResolucao)
     .map((s) => {
       const ini = s.dataSolicitacao?.toDate ? s.dataSolicitacao.toDate() : new Date(s.dataSolicitacao);
@@ -98,19 +135,23 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
   }
 
   let lista = [...solicitacoes];
-  if (!mostrarRespondidas) {
-    lista = lista.filter((s) => !(s.status === 'Em Estoque' && (s.instalada === true || s.instalada === false)));
-  }
   if (filtro === 'atrasadas') {
     lista = lista.filter((s) => s.status !== 'Em Estoque' && daysSince(s.dataSolicitacao) > (config.alertaDias || 7));
+  } else if (filtro === 'Instalada') {
+    lista = lista.filter((s) => s.status === 'Em Estoque' && s.instalada === true);
+  } else if (filtro === 'Em Estoque') {
+    lista = lista.filter((s) => s.status === 'Em Estoque' && s.instalada !== true);
   } else if (filtro) {
     lista = lista.filter((s) => s.status === filtro);
+  } else {
+    // Sem nenhum card selecionado: peças já instaladas ficam fora da visão geral por padrão.
+    lista = lista.filter((s) => !(s.status === 'Em Estoque' && s.instalada === true));
   }
   if (busca.trim()) {
     const b = busca.toLowerCase();
     lista = lista.filter((s) => {
       const v = frota.find((f) => f.id === s.veiculoId);
-      const texto = [s.peca, v ? veiculoLabel(v) : '', s.matriculaEncarregado, s.observacoes].join(' ').toLowerCase();
+      const texto = [s.peca, v ? veiculoLabel(v) : '', s.matriculaEncarregado, s.observacoes, s.motivoNaoInstalada].join(' ').toLowerCase();
       return texto.includes(b);
     });
   }
@@ -126,8 +167,17 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
     outlineOffset: -1,
   });
 
+  function confirmarMotivo(motivo) {
+    onUpdateInstalada(modalMotivoId, false, motivo);
+    setModalMotivoId(null);
+  }
+
   return (
     <>
+      {modalMotivoId && (
+        <ModalMotivo onCancelar={() => setModalMotivoId(null)} onConfirmar={confirmarMotivo} />
+      )}
+
       <div className="topbar">
         <div>
           <h1>Situação da Frota</h1>
@@ -149,7 +199,10 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
           <Sail color="#3B3E8C" /><div className="kpi">{cotacao.length}</div><div className="lbl">Em cotação</div>
         </div>
         <div className="card ok" style={cardStyle(filtro === 'Em Estoque')} onClick={() => alternarFiltro('Em Estoque')}>
-          <Sail color="#00843D" /><div className="kpi">{resolvidas.length}</div><div className="lbl">Já em estoque</div>
+          <Sail color="#00843D" /><div className="kpi">{emEstoqueAguardando.length}</div><div className="lbl">Já em estoque</div>
+        </div>
+        <div className="card ok" style={cardStyle(filtro === 'Instalada')} onClick={() => alternarFiltro('Instalada')}>
+          <Sail color="#00622D" /><div className="kpi">{instaladas.length}</div><div className="lbl">Instaladas no veículo</div>
         </div>
         <div className="card">
           <Sail color="#00843D" /><div className="kpi">{media}{media !== '—' ? ' d' : ''}</div><div className="lbl">Média p/ atendimento</div>
@@ -170,13 +223,6 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
             <label>Buscar</label>
             <input type="text" placeholder="Peça, nº de frota ou matrícula..." value={busca} onChange={(e) => setBusca(e.target.value)} />
           </div>
-          <div className="field">
-            <label>&nbsp;</label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 13.5, color: 'var(--texto)', padding: '9px 0' }}>
-              <input type="checkbox" style={{ width: 'auto' }} checked={mostrarRespondidas} onChange={(e) => setMostrarRespondidas(e.target.checked)} />
-              Mostrar peças já respondidas (instalada)
-            </label>
-          </div>
         </div>
 
         {lista.length === 0 ? (
@@ -185,7 +231,7 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
             <h3>Nada encontrado</h3>
             <p>
               Ajuste os filtros ou a busca acima.
-              {!mostrarRespondidas && ' Peças já respondidas (instalada) estão ocultas por padrão.'}
+              {!filtro && ' Peças já instaladas no veículo ficam no card "Instaladas no veículo".'}
             </p>
           </div>
         ) : (
@@ -205,6 +251,7 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
                   const tempo = s.status === 'Em Estoque'
                     ? 'concluído'
                     : daysSince(s.dataSolicitacao) + 'd em aberto';
+                  const temNota = Boolean(s.observacoes || s.motivoNaoInstalada);
                   return (
                     <Fragment key={s.id}>
                       <tr className={atraso ? 'row-alerta' : ''}>
@@ -220,7 +267,7 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
                           {tempo}{atraso ? ' ⚠' : ''}
                         </td>
                         <td>
-                          {s.observacoes ? (
+                          {temNota ? (
                             <button className="btn btn-ghost btn-sm" onClick={() => alternarNota(s.id)}>
                               📝 {notasAbertas.has(s.id) ? 'Ocultar' : 'Ver'}
                             </button>
@@ -229,13 +276,23 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
                           )}
                         </td>
                         <td>
-                          <ControleInstalada solicitacao={s} podeEditar={podeMarcarInstalada} onUpdateInstalada={onUpdateInstalada} />
+                          <ControleInstalada
+                            solicitacao={s}
+                            podeEditar={podeMarcarInstalada}
+                            onUpdateInstalada={onUpdateInstalada}
+                            onPedirMotivo={setModalMotivoId}
+                          />
                         </td>
                       </tr>
-                      {notasAbertas.has(s.id) && s.observacoes && (
+                      {notasAbertas.has(s.id) && temNota && (
                         <tr>
                           <td colSpan={11} style={{ background: '#FAFBFC', fontSize: 13, padding: '10px 14px' }}>
-                            <strong>Observação:</strong> {s.observacoes}
+                            {s.observacoes && <div><strong>Observação:</strong> {s.observacoes}</div>}
+                            {s.motivoNaoInstalada && (
+                              <div style={{ marginTop: s.observacoes ? 6 : 0 }}>
+                                <strong>Motivo não instalada:</strong> {s.motivoNaoInstalada}
+                              </div>
+                            )}
                           </td>
                         </tr>
                       )}

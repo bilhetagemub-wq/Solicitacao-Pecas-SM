@@ -42,6 +42,7 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
       'Matrícula Encarregado': s.matriculaEncarregado,
       'Dias em Aberto': s.status !== 'Em Estoque' ? daysSince(s.dataSolicitacao) : '',
       'Atrasada': atrasada ? 'Sim' : 'Não',
+      'Motivo Não Instalada': s.instalada === false ? (s.motivoNaoInstalada || '') : '',
       'Observações': s.observacoes || '',
     };
   }
@@ -51,7 +52,7 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
     const ws = XLSX.utils.json_to_sheet(linhas);
     ws['!cols'] = [
       { wch: 17 }, { wch: 9 }, { wch: 12 }, { wch: 7 }, { wch: 26 }, { wch: 10 }, { wch: 12 },
-      { wch: 18 }, { wch: 11 }, { wch: 18 }, { wch: 18 }, { wch: 13 }, { wch: 10 }, { wch: 30 },
+      { wch: 18 }, { wch: 11 }, { wch: 18 }, { wch: 18 }, { wch: 13 }, { wch: 10 }, { wch: 30 }, { wch: 30 },
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Peças');

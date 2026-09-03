@@ -172,8 +172,10 @@ function AppInner() {
     }
   };
 
-  const atualizarInstalada = async (id, valor) => {
-    await updateDoc(doc(db, 'solicitacoes', id), { instalada: valor, dataInstalada: serverTimestamp() });
+  const atualizarInstalada = async (id, valor, motivo) => {
+    const patch = { instalada: valor, dataInstalada: serverTimestamp() };
+    patch.motivoNaoInstalada = valor === false ? (motivo || '') : null;
+    await updateDoc(doc(db, 'solicitacoes', id), patch);
     notify(valor ? 'Marcado: peça instalada no veículo.' : 'Marcado: peça não instalada no veículo.', 'ok');
   };
 
