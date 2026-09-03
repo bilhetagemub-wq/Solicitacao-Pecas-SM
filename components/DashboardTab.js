@@ -20,7 +20,7 @@ function prioridadeBadgeClass(p) {
   return p === 'Alta' ? 'badge-alta' : p === 'Média' ? 'badge-media' : 'badge-baixa';
 }
 
-function ControleInstalada({ solicitacao, podeEditar, onUpdateInstalada, onPedirMotivo }) {
+function ControleInstalada({ solicitacao, podeEditar, onUpdateInstalada, onPedirMotivo, onLimpar }) {
   if (solicitacao.status !== 'Em Estoque') {
     return <span className="muted">—</span>;
   }
@@ -59,6 +59,15 @@ function ControleInstalada({ solicitacao, podeEditar, onUpdateInstalada, onPedir
       >
         Não
       </button>
+      {definido && (
+        <button
+          className="btn btn-ghost btn-sm"
+          title="Limpar resposta (volta para 'Aguardando confirmação')"
+          onClick={() => { if (confirm('Limpar a resposta desta peça? Ela volta para "Aguardando confirmação".')) onLimpar(solicitacao.id); }}
+        >
+          🗑
+        </button>
+      )}
     </div>
   );
 }
@@ -98,7 +107,7 @@ function ModalMotivo({ onCancelar, onConfirmar }) {
   );
 }
 
-export default function DashboardTab({ frota, solicitacoes, config, role, onUpdateInstalada, onDelete }) {
+export default function DashboardTab({ frota, solicitacoes, config, role, onUpdateInstalada, onLimparInstalada, onDelete }) {
   const podeMarcarInstalada = ['encarregado', 'developer'].includes(role);
   const podeExcluir = role === 'developer';
   const [filtro, setFiltro] = useState(null); // null | 'Pendente' | 'Em Cotação' | 'Em Estoque' | 'Instalada' | 'atrasadas'
@@ -282,6 +291,7 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
                             podeEditar={podeMarcarInstalada}
                             onUpdateInstalada={onUpdateInstalada}
                             onPedirMotivo={setModalMotivoId}
+                            onLimpar={onLimparInstalada}
                           />
                         </td>
                         {podeExcluir && (

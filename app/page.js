@@ -179,6 +179,11 @@ function AppInner() {
     notify(valor ? 'Marcado: peça instalada no veículo.' : 'Marcado: peça não instalada no veículo.', 'ok');
   };
 
+  const limparInstalada = async (id) => {
+    await updateDoc(doc(db, 'solicitacoes', id), { instalada: null, motivoNaoInstalada: null, dataInstalada: null });
+    notify('Resposta removida — peça voltou para "Aguardando confirmação".', 'ok');
+  };
+
   const excluirSolicitacao = async (id) => {
     await deleteDoc(doc(db, 'solicitacoes', id));
     notify('Solicitação excluída.', 'ok');
@@ -207,7 +212,7 @@ function AppInner() {
           ) : (
             <>
               {view === 'dashboard' && allowedTabs.includes('dashboard') && (
-                <DashboardTab frota={frota} solicitacoes={solicitacoes} config={config} role={role} onUpdateInstalada={atualizarInstalada} onDelete={excluirSolicitacao} />
+                <DashboardTab frota={frota} solicitacoes={solicitacoes} config={config} role={role} onUpdateInstalada={atualizarInstalada} onLimparInstalada={limparInstalada} onDelete={excluirSolicitacao} />
               )}
               {view === 'solicitacao' && allowedTabs.includes('solicitacao') && (
                 <SolicitarTab frota={frota} solicitacoes={solicitacoes} onSubmit={criarSolicitacao} onDelete={excluirSolicitacao} />
