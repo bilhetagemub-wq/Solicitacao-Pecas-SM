@@ -173,10 +173,21 @@ function AppInner() {
   };
 
   const atualizarInstalada = async (id, valor, motivo) => {
-    const patch = { instalada: valor, dataInstalada: serverTimestamp() };
-    patch.motivoNaoInstalada = valor === false ? (motivo || '') : null;
+    const patch = { dataInstalada: serverTimestamp() };
+    if (valor === false) {
+      // Peça não instalada: volta a ser um pedido em aberto (Pendente) de novo.
+      patch.instalada = null;
+      patch.motivoNaoInstalada = motivo || '';
+      patch.status = 'Pendente';
+      patch.dataStatus = serverTimestamp();
+      patch.dataResolucao = null;
+      patch.alertaEnviado = false;
+    } else {
+      patch.instalada = true;
+      patch.motivoNaoInstalada = null;
+    }
     await updateDoc(doc(db, 'solicitacoes', id), patch);
-    notify(valor ? 'Marcado: peça instalada no veículo.' : 'Marcado: peça não instalada no veículo.', 'ok');
+    notify(valor ? 'Marcado: peça instalada no veículo.' : 'Peça marcada como não instalada — voltou para Pendente.', 'ok');
   };
 
   const limparInstalada = async (id) => {
@@ -212,7 +223,7 @@ function AppInner() {
           ) : (
             <>
               {view === 'dashboard' && allowedTabs.includes('dashboard') && (
-                <DashboardTab frota={frota} solicitacoes={solicitacoes} config={config} role={role} onUpdateInstalada={atualizarInstalada} onLimparInstalada={limparInstalada} onDelete={excluirSolicitacao} />
+                <DashboardTab frota={frota} solicitacoes={solicitacoes} config={config} role={role} onUpdateInstalada={atualizarInstalada} onLimparInstalada={limparInstalada} />
               )}
               {view === 'solicitacao' && allowedTabs.includes('solicitacao') && (
                 <SolicitarTab frota={frota} solicitacoes={solicitacoes} onSubmit={criarSolicitacao} onDelete={excluirSolicitacao} />
