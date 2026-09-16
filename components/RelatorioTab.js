@@ -7,10 +7,11 @@ import { daysSince, fmtDate, veiculoLabel } from '../lib/utils';
 export default function RelatorioTab({ frota, solicitacoes, config }) {
   const [somenteAtrasadas, setSomenteAtrasadas] = useState(false);
 
-  // Mostra tudo (pendentes, em cotação, em estoque) — só as já instaladas no veículo
-  // ficam de fora. Peças marcadas como "não instalada" voltam a ser Pendente
-  // automaticamente, então já aparecem aqui normalmente, sem precisar de filtro extra.
-  let lista = solicitacoes.filter((s) => !(s.status === 'Em Estoque' && s.instalada === true));
+  // Só duas categorias aparecem aqui: Pendente, e Em Estoque que ainda não foi confirmado
+  // como instalado (aguardando confirmação). Em Cotação e peças já instaladas ficam de fora.
+  let lista = solicitacoes.filter((s) =>
+    s.status === 'Pendente' || (s.status === 'Em Estoque' && s.instalada !== true)
+  );
   if (somenteAtrasadas) {
     lista = lista.filter((s) => s.status !== 'Em Estoque' && daysSince(s.dataSolicitacao) > (config.alertaDias || 7));
   }
@@ -77,8 +78,8 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
           </label>
         </div>
         <p className="muted" style={{ marginTop: -4, marginBottom: 14 }}>
-          Mostra peças pendentes, em cotação e em estoque. Peças já instaladas no veículo
-          nunca aparecem aqui.
+          Mostra somente peças pendentes e peças já em estoque aguardando confirmação (que
+          ainda não foram pro veículo). Peças em cotação e já instaladas não aparecem aqui.
         </p>
         <p className="muted" style={{ margin: '0 0 14px' }}>{lista.length} solicitação(ões) nesse filtro.</p>
         <button className="btn btn-primary" onClick={baixarExcel} disabled={lista.length === 0}>
