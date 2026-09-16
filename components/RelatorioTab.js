@@ -21,9 +21,14 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
     return db_ - da;
   });
 
+  function foiDevolvida(s) {
+    return s.status === 'Pendente' && Boolean(s.motivoNaoInstalada);
+  }
+
   function textoInstalada(s) {
-    if (s.status !== 'Em Estoque') return '';
-    return 'Aguardando confirmação';
+    if (s.status === 'Em Estoque') return 'Aguardando confirmação';
+    if (foiDevolvida(s)) return 'Retornou (não instalada)';
+    return '';
   }
 
   function montarLinha(s) {
@@ -37,7 +42,7 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
       'Peça': s.peca,
       'Quantidade': s.quantidade,
       'Status': s.status,
-      'Instalada no Veículo': textoInstalada(s),
+      'Situação': textoInstalada(s),
       'Prioridade': s.prioridade,
       'Matrícula Solicitante': s.matriculaSolicitante,
       'Matrícula Encarregado': s.matriculaEncarregado,
@@ -80,6 +85,8 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
         <p className="muted" style={{ marginTop: -4, marginBottom: 14 }}>
           Mostra somente peças pendentes e peças já em estoque aguardando confirmação (que
           ainda não foram pro veículo). Peças em cotação e já instaladas não aparecem aqui.
+          Linhas em destaque (amarelo) são peças que já foram marcadas como "não instalada"
+          e voltaram para pendente — a coluna "Situação" mostra "Retornou (não instalada)".
         </p>
         <p className="muted" style={{ margin: '0 0 14px' }}>{lista.length} solicitação(ões) nesse filtro.</p>
         <button className="btn btn-primary" onClick={baixarExcel} disabled={lista.length === 0}>
@@ -94,13 +101,18 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
         ) : (
           <>
             <table>
-              <thead><tr><th>Data</th><th>Veículo</th><th>Peça</th><th>Qtd</th><th>Status</th><th>Instalada</th><th>Prioridade</th><th>Tempo</th></tr></thead>
+              <thead><tr><th>Data</th><th>Veículo</th><th>Peça</th><th>Qtd</th><th>Status</th><th>Situação</th><th>Prioridade</th><th>Tempo</th></tr></thead>
               <tbody>
                 {lista.slice(0, 50).map((s) => {
                   const v = frota.find((f) => f.id === s.veiculoId);
                   const atrasada = s.status !== 'Em Estoque' && daysSince(s.dataSolicitacao) > (config.alertaDias || 7);
+                  const devolvida = foiDevolvida(s);
                   return (
-                    <tr key={s.id} className={atrasada ? 'row-alerta' : ''}>
+                    <tr
+                      key={s.id}
+                      className={atrasada ? 'row-alerta' : ''}
+                      style={!atrasada && devolvida ? { background: '#FFF6E0' } : undefined}
+                    >
                       <td className="muted">{s.dataSolicitacao ? fmtDate(s.dataSolicitacao) : '—'}</td>
                       <td><span className="veh-tag">{veiculoLabel(v)}</span></td>
                       <td>{s.peca}</td>
