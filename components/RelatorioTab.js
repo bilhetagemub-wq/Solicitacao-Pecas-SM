@@ -5,10 +5,12 @@ import * as XLSX from 'xlsx';
 import { daysSince, fmtDate, veiculoLabel } from '../lib/utils';
 
 export default function RelatorioTab({ frota, solicitacoes, config }) {
-  const [incluirResolvidas, setIncluirResolvidas] = useState(false);
   const [somenteAtrasadas, setSomenteAtrasadas] = useState(false);
 
-  let lista = solicitacoes.filter((s) => incluirResolvidas || s.status !== 'Em Estoque');
+  // Mostra tudo (pendentes, em cotação, em estoque) — só as já instaladas no veículo
+  // ficam de fora. Peças marcadas como "não instalada" voltam a ser Pendente
+  // automaticamente, então já aparecem aqui normalmente, sem precisar de filtro extra.
+  let lista = solicitacoes.filter((s) => !(s.status === 'Em Estoque' && s.instalada === true));
   if (somenteAtrasadas) {
     lista = lista.filter((s) => s.status !== 'Em Estoque' && daysSince(s.dataSolicitacao) > (config.alertaDias || 7));
   }
@@ -20,8 +22,6 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
 
   function textoInstalada(s) {
     if (s.status !== 'Em Estoque') return '';
-    if (s.instalada === true) return 'Sim';
-    if (s.instalada === false) return 'Não';
     return 'Aguardando confirmação';
   }
 
@@ -42,7 +42,7 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
       'Matrícula Encarregado': s.matriculaEncarregado,
       'Dias em Aberto': s.status !== 'Em Estoque' ? daysSince(s.dataSolicitacao) : '',
       'Atrasada': atrasada ? 'Sim' : 'Não',
-      'Motivo Não Instalada': s.instalada === false ? (s.motivoNaoInstalada || '') : '',
+      'Motivo Não Instalada (histórico)': s.motivoNaoInstalada || '',
       'Observações': s.observacoes || '',
     };
   }
@@ -72,14 +72,14 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
       <div className="panel">
         <div className="filters">
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 13.5, color: 'var(--texto)' }}>
-            <input type="checkbox" style={{ width: 'auto' }} checked={incluirResolvidas} onChange={(e) => setIncluirResolvidas(e.target.checked)} />
-            Incluir peças já em estoque (resolvidas)
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 13.5, color: 'var(--texto)' }}>
             <input type="checkbox" style={{ width: 'auto' }} checked={somenteAtrasadas} onChange={(e) => setSomenteAtrasadas(e.target.checked)} />
             Mostrar somente atrasadas
           </label>
         </div>
+        <p className="muted" style={{ marginTop: -4, marginBottom: 14 }}>
+          Mostra peças pendentes, em cotação e em estoque. Peças já instaladas no veículo
+          nunca aparecem aqui.
+        </p>
         <p className="muted" style={{ margin: '0 0 14px' }}>{lista.length} solicitação(ões) nesse filtro.</p>
         <button className="btn btn-primary" onClick={baixarExcel} disabled={lista.length === 0}>
           Baixar relatório (.xlsx)
