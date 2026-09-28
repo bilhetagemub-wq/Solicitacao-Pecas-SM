@@ -1,0 +1,21 @@
+{
+  "name": "sao-miguel-controle-pecas",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "firebase": "^10.12.2",
+    "firebase-admin": "^12.1.1",
+    "jspdf": "^2.5.2",
+    "next": "14.2.35",
+    "nodemailer": "^9.0.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "resend": "^3.4.0",
+    "xlsx": "^0.18.5"
+  }
+}
