@@ -236,50 +236,6 @@ export function integrantesDoDia(dia, funcionarios, ajustes = {}, excluir = new 
 }
 
 // ------------------------------------------------------
-// Encarregados
-// ------------------------------------------------------
-//
-// modo "proprio": os encarregados revezam entre si por fim de semana;
-//   o mesmo encarregado fica no sábado e no domingo, qualquer que seja
-//   a equipe de cada dia. Feriado em dia útil fica com o encarregado da
-//   equipe do feriado (ou, sem ele, com o do fim de semana seguinte).
-// modo "equipe": o encarregado trabalha junto com a própria equipe.
-//
-// encarregados = lista ordenada [{ id, equipeId }]
-// ajustes.encarregados = { "AAAA-MM-DD": funcionarioId | "" }  (troca manual; "" = nenhum)
-
-export function atribuirEncarregados(dias, { encarregados, config = {}, ajustes = {}, modo = "equipe" }) {
-    const n = encarregados.length;
-    const ids = new Set(encarregados.map((e) => e.id));
-    const trocas = ajustes.encarregados || {};
-    const inicial = Math.max(0, encarregados.findIndex((e) => e.id === config.encarregadoInicialId));
-
-    const doRodizio = (iso) => (n ? encarregados[mod(inicial + semanasDesdeReferencia(iso, config), n)].id : null);
-    const daEquipe = (equipeId) => encarregados.find((e) => e.equipeId && e.equipeId === equipeId)?.id || null;
-
-    return dias.map((d) => {
-        let original = null;
-        if (modo === "proprio") {
-            original = d.fimDeSemana ? doRodizio(d.data) : (daEquipe(d.equipeId) || doRodizio(d.data));
-        } else {
-            original = daEquipe(d.equipeId);
-        }
-
-        let encarregadoId = original;
-        let encarregadoAlterado = false;
-        if (Object.prototype.hasOwnProperty.call(trocas, d.data)) {
-            const t = trocas[d.data];
-            if (t === "" || ids.has(t)) {
-                encarregadoId = t || null;
-                encarregadoAlterado = encarregadoId !== original;
-            }
-        }
-
-        return { ...d, encarregadoId, encarregadoOriginalId: original, encarregadoAlterado };
-    });
-}
-
-// ------------------------------------------------------
 // Feriados nacionais do Brasil
 // ------------------------------------------------------
 

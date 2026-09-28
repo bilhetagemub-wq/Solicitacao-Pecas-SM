@@ -4,14 +4,15 @@
 // ======================================================
 //
 // Coleções usadas:
-//   equipes       { nome, cor, ordem, escala: "diurna" | "noturna" }
-//   funcionarios  { nome, matricula, funcao, turno: "Diurno" | "Noturno", status, equipeId, ordem, lider }
-//   feriados      { data: "AAAA-MM-DD", descricao, equipeFixa: { diurna, noturna } }
+//   equipes       { nome, cor, ordem }   (a função: Elétrica, Mecânica...)
+//   funcionarios  { nome, matricula, equipeId, funcao (cargo), turno: "Diurno" | "Noturno",
+//                   turma: "A" | "B" | null, lider, status }
+//   feriados      { data: "AAAA-MM-DD", descricao, equipeFixa: { diurna: "A"|"B"|null, noturna } }
 //   config/escala-{tipo}      { modo, dataReferencia, equipeInicialId, feriadoEquipeInicialId, feriadoNoFimDeSemana }
 //   escalas/{AAAA-MM}-{tipo}  { trocas, ausencias, encarregados, dias (retrato salvo), atualizadoEm }
 
 import { db } from "./firebase.js";
-import { CONFIG_PADRAO, integrantesDoDia } from "./escala-engine.js";
+import { CONFIG_PADRAO } from "./escala-engine.js";
 
 import {
     collection,
@@ -39,8 +40,8 @@ export const ROTULO_AUSENCIA = { FE: "Férias", A: "Afastamento" };
 // ------------------------------------------------------
 // Tipos de escala: diurna e noturna
 // ------------------------------------------------------
-// Cada tipo tem suas próprias equipes, rodízio, fila de feriados
-// e escala salva. O funcionário pertence ao tipo pelo campo "turno".
+// Cada tipo tem seu próprio rodízio de turmas, fila de feriados e escala
+// salva. O funcionário pertence ao tipo pelo campo "turno".
 
 export const TIPOS = {
     diurna: { id: "diurna", rotulo: "Escala diurna", curto: "Diurna", turno: "Diurno", icone: "fa-sun" },
@@ -66,54 +67,103 @@ export function tipoDoTexto(texto) {
 }
 
 export const tipoDoFuncionario = (f) => tipoDoTexto(f?.turno) || "diurna";
-export const tipoDaEquipe = (e) => (e?.escala === "noturna" ? "noturna" : "diurna");
 
-// Equipe fixa de um feriado para o tipo (compatível com o campo antigo equipeFixaId)
-export function equipeFixaDoTipo(feriado, tipo, equipes) {
-    if (feriado.equipeFixa && tipo in feriado.equipeFixa) return feriado.equipeFixa[tipo] || null;
-    const antiga = feriado.equipeFixaId;
-    if (antiga && equipes.some((e) => e.id === antiga && tipoDaEquipe(e) === tipo)) return antiga;
+// ------------------------------------------------------
+// Turmas de fim de semana
+// ------------------------------------------------------
+// O rodízio é por turma: no fim de semana A trabalham todos da turma A,
+// no fim de semana B, todos da turma B. As equipes são só a função
+// (Elétrica, Mecânica...) e servem para organizar a lista.
+
+export const TURMAS = [
+    { id: "A", nome: "Fim de semana A", curto: "Turma A", cor: "#0A9447" },
+    { id: "B", nome: "Fim de semana B", curto: "Turma B", cor: "#3B3F96" }
+];
+
+export const turmaPorId = (id) => TURMAS.find((t) => t.id === id) || null;
+export const turmaDe = (f) => (f?.turma === "A" || f?.turma === "B" ? f.turma : null);
+
+export function turmaDoTexto(texto) {
+    const t = normalizar(texto).replace(/^(fim de semana|fds|turma|grupo)\s*/, "");
+    if (["a", "1"].includes(t)) return "A";
+    if (["b", "2"].includes(t)) return "B";
     return null;
 }
 
-// Encarregado = líder da equipe. Marcado no cadastro; sem marcação,
-// vale a função (qualquer função com "encarregado").
-export function ehEncarregado(f) {
+// Turma fixa de um feriado na escala (valores antigos que não sejam A/B são ignorados)
+export function turmaFixaDoFeriado(feriado, tipo) {
+    const v = feriado.equipeFixa?.[tipo];
+    return v === "A" || v === "B" ? v : null;
+}
+
+// ------------------------------------------------------
+// Encarregados
+// ------------------------------------------------------
+// Marcado no cadastro. Sem marcação, vale o cargo ou a equipe
+// com "encarregado" no nome.
+
+export function ehEncarregado(f, equipes = []) {
     if (typeof f?.lider === "boolean") return f.lider;
-    return normalizar(f?.funcao).includes("encarregad");
+    if (normalizar(f?.funcao).includes("encarregad")) return true;
+    const equipe = equipes.find((e) => e.id === f?.equipeId);
+    return normalizar(equipe?.nome).includes("encarregad");
 }
 
-// Modo padrão: diurno reveza entre si e fica o fim de semana inteiro;
-// noturno acompanha a própria equipe.
-export const MODO_ENCARREGADO_PADRAO = { diurna: "proprio", noturna: "equipe" };
+// "todos": trabalha nos dois fins de semana (padrão da diurna)
+// "turma": trabalha só no fim de semana da turma dele (padrão da noturna)
+export const MODO_ENCARREGADO_PADRAO = { diurna: "todos", noturna: "turma" };
 
-export const modoEncarregado = (config, tipo) => config?.encarregadoModo || MODO_ENCARREGADO_PADRAO[tipo];
-
-// Encarregados ativos da escala, na ordem das equipes (e da coluna)
-export function encarregadosDaEscala(funcionarios, equipesDoTipo, tipo) {
-    const pos = new Map(equipesDoTipo.map((e, i) => [e.id, i]));
-    return funcionarios
-        .filter((f) => f.status !== "Inativo" && tipoDoFuncionario(f) === tipo && ehEncarregado(f))
-        .sort((a, b) =>
-            (pos.get(a.equipeId) ?? 999) - (pos.get(b.equipeId) ?? 999) ||
-            (a.ordem ?? 0) - (b.ordem ?? 0) ||
-            (a.nome || "").localeCompare(b.nome || "")
-        );
+export function modoEncarregado(config, tipo) {
+    const m = config?.encarregadoModo;
+    if (m === "todos" || m === "proprio") return "todos";
+    if (m === "turma" || m === "equipe") return "turma";
+    return MODO_ENCARREGADO_PADRAO[tipo];
 }
 
-// Quem trabalha no dia: o encarregado em destaque e os demais integrantes.
-// No rodízio próprio, os encarregados só aparecem nos dias em que são o encarregado.
-export function pessoasDoDia(dia, funcionarios, ajustes, encarregados, modo) {
-    const excluir = new Set(modo === "proprio" ? encarregados.map((f) => f.id) : []);
-    if (dia.encarregadoId) excluir.add(dia.encarregadoId);
+// Funcionários ativos de uma escala
+export const ativosDaEscala = (funcionarios, tipo) =>
+    funcionarios.filter((f) => f.status !== "Inativo" && tipoDoFuncionario(f) === tipo);
 
-    const f = dia.encarregadoId ? funcionarios.find((x) => x.id === dia.encarregadoId) : null;
-    const ausencia = f ? ajustes?.ausencias?.[dia.data]?.[f.id] || null : null;
+// Ordena por equipe (na ordem das equipes) e nome
+export function ordenarPorEquipe(lista, equipes) {
+    const pos = new Map(equipes.map((e, i) => [e.id, i]));
+    return [...lista].sort((a, b) =>
+        (pos.get(a.equipeId) ?? 999) - (pos.get(b.equipeId) ?? 999) ||
+        (a.nome || "").localeCompare(b.nome || "")
+    );
+}
 
-    return {
-        encarregado: f ? { ...f, ausencia } : null,
-        integrantes: integrantesDoDia(dia, funcionarios, ajustes, excluir)
-    };
+// Quem trabalha no dia (dia.equipeId é a turma: "A" ou "B")
+// Devolve os encarregados em destaque e os demais agrupados por equipe.
+export function pessoasDoDia(dia, funcionarios, ajustes, tipo, modo, equipes) {
+    const ausencias = ajustes?.ausencias?.[dia.data] || {};
+    const comAusencia = (f) => ({ ...f, ausencia: ausencias[f.id] || null });
+    const ativos = ativosDaEscala(funcionarios, tipo);
+
+    const encarregados = ordenarPorEquipe(
+        ativos.filter((f) => ehEncarregado(f, equipes) && (modo === "todos" || turmaDe(f) === dia.equipeId)),
+        equipes
+    ).map(comAusencia);
+
+    const integrantes = ordenarPorEquipe(
+        ativos.filter((f) => !ehEncarregado(f, equipes) && turmaDe(f) === dia.equipeId),
+        equipes
+    ).map(comAusencia);
+
+    // agrupa por equipe, na ordem das equipes; sem equipe por último
+    const grupos = [];
+    integrantes.forEach((f) => {
+        const id = equipes.some((e) => e.id === f.equipeId) ? f.equipeId : "";
+        let g = grupos.find((x) => x.equipeId === id);
+        if (!g) {
+            const e = equipes.find((x) => x.id === id);
+            g = { equipeId: id, nome: e?.nome || "Sem equipe", cor: e?.cor || "#8b93a1", pessoas: [] };
+            grupos.push(g);
+        }
+        g.pessoas.push(f);
+    });
+
+    return { encarregados, integrantes, grupos };
 }
 
 export function proximaCor(equipes) {

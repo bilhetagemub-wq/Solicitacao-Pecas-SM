@@ -63,7 +63,7 @@
 
 .plantao-equipe{
     font-family:var(--fonte-titulo);
-    font-size:34px;
+    font-size:30px;
     font-weight:700;
     margin:2px 0 12px;
 }
@@ -91,6 +91,20 @@
 .plantao-lider strong{ font-weight:700; }
 .plantao-lider small{ color:#b4232a; font-weight:700; font-size:12px; }
 .plantao-lider.ausente strong{ text-decoration:line-through; color:var(--tinta-3); }
+
+.plantao-grupo{ margin-top:8px; }
+
+.plantao-grupo-nome{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:12px;
+    font-weight:700;
+    color:var(--tinta-2);
+    margin-bottom:4px;
+}
+
+.plantao-grupo-nome i{ width:8px; height:8px; border-radius:50%; background:var(--cor-grupo); }
 
 .plantao-membros{
     list-style:none;
