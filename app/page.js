@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc,
   setDoc, getDoc, query, orderBy, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../lib/firebaseClient';
-import { TAB_ACCESS } from '../lib/roles';
+import { resolverAcessos, abaInicial } from '../lib/roles';
 import {
   tocarBipAlerta, permissaoNotificacaoConcedida, solicitarPermissaoNotificacao, notificarNavegador,
 } from '../lib/notificacoes';
@@ -22,9 +22,15 @@ import ConfiguracoesTab from '../components/ConfiguracoesTab';
 
 function AppInner() {
   const { user, role } = useAuthInfo();
-  const allowedTabs = TAB_ACCESS[role] || [];
+  // Quais abas cada função enxerga: vem da aba Configurações (documento config/permissoes);
+  // enquanto nada foi salvo — ou se o dado estiver inválido — vale o padrão do sistema.
+  const [permissoesBrutas, setPermissoesBrutas] = useState(null);
+  const [permissoesMeta, setPermissoesMeta] = useState(null);
+  const [permCarregadas, setPermCarregadas] = useState(false);
+  const acessos = useMemo(() => resolverAcessos(permissoesBrutas), [permissoesBrutas]);
+  const allowedTabs = acessos[role] || [];
 
-  const [view, setView] = useState(allowedTabs[0] || 'dashboard');
+  const [view, setView] = useState(abaInicial(role, allowedTabs) || 'dashboard');
   const [frota, setFrota] = useState([]);
   const [solicitacoes, setSolicitacoes] = useState([]);
   const [config, setConfig] = useState({ alertaDias: 7, alertEmails: [] });
@@ -53,13 +59,15 @@ function AppInner() {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500);
   }, []);
 
-  // Garante que a aba atual é permitida para a função do usuário
+  // Garante que a aba atual é permitida para a função do usuário — inclusive quando
+  // as permissões são alteradas por um Developer enquanto este usuário está com o sistema aberto.
+  const chaveAcessos = allowedTabs.join('|');
   useEffect(() => {
     if (allowedTabs.length && !allowedTabs.includes(view)) {
-      setView(allowedTabs[0]);
+      setView(abaInicial(role, allowedTabs));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role]);
+  }, [role, chaveAcessos]);
 
   useEffect(() => {
     const unsubFrota = onSnapshot(
@@ -108,7 +116,18 @@ function AppInner() {
       if (snap.exists()) setConfig(snap.data());
     });
 
-    return () => { unsubFrota(); unsubSol(); unsubCfg(); };
+    const unsubPerm = onSnapshot(
+      doc(db, 'config', 'permissoes'),
+      (snap) => {
+        const dados = snap.exists() ? snap.data() : null;
+        setPermissoesBrutas(dados?.tabs || null);
+        setPermissoesMeta(dados ? { por: dados.atualizadoPor, em: dados.atualizadoEm } : null);
+        setPermCarregadas(true);
+      },
+      () => setPermCarregadas(true) // sem conseguir ler: segue com o padrão do sistema
+    );
+
+    return () => { unsubFrota(); unsubSol(); unsubCfg(); unsubPerm(); };
   }, [notify]);
 
   // --- ações: frota ---
@@ -173,10 +192,21 @@ function AppInner() {
   };
 
   const atualizarInstalada = async (id, valor, motivo) => {
-    const patch = { instalada: valor, dataInstalada: serverTimestamp() };
-    patch.motivoNaoInstalada = valor === false ? (motivo || '') : null;
+    const patch = { dataInstalada: serverTimestamp() };
+    if (valor === false) {
+      // Peça não instalada: volta a ser um pedido em aberto (Pendente) de novo.
+      patch.instalada = null;
+      patch.motivoNaoInstalada = motivo || '';
+      patch.status = 'Pendente';
+      patch.dataStatus = serverTimestamp();
+      patch.dataResolucao = null;
+      patch.alertaEnviado = false;
+    } else {
+      patch.instalada = true;
+      patch.motivoNaoInstalada = null;
+    }
     await updateDoc(doc(db, 'solicitacoes', id), patch);
-    notify(valor ? 'Marcado: peça instalada no veículo.' : 'Marcado: peça não instalada no veículo.', 'ok');
+    notify(valor ? 'Marcado: peça instalada no veículo.' : 'Peça marcada como não instalada — voltou para Pendente.', 'ok');
   };
 
   const limparInstalada = async (id) => {
@@ -193,6 +223,19 @@ function AppInner() {
     await setDoc(doc(db, 'config', 'geral'), novoConfig, { merge: true });
   };
 
+  const salvarPermissoes = async (mapa) => {
+    try {
+      await setDoc(doc(db, 'config', 'permissoes'), {
+        tabs: mapa,
+        atualizadoEm: serverTimestamp(),
+        atualizadoPor: user.email,
+      });
+      notify('Permissões atualizadas.', 'ok');
+    } catch (err) {
+      notify('Não foi possível salvar as permissões: ' + err.message, 'err');
+    }
+  };
+
   return (
     <>
       <div className="toast-wrap">
@@ -207,7 +250,7 @@ function AppInner() {
           notificacoesAtivas={notificacoesAtivas} onAtivarNotificacoes={ativarNotificacoes}
         />
         <div className="main">
-          {loading ? (
+          {(loading || !permCarregadas) ? (
             <p className="muted">Carregando dados do Firebase…</p>
           ) : (
             <>
@@ -215,7 +258,7 @@ function AppInner() {
                 <DashboardTab frota={frota} solicitacoes={solicitacoes} config={config} role={role} onUpdateInstalada={atualizarInstalada} onLimparInstalada={limparInstalada} />
               )}
               {view === 'solicitacao' && allowedTabs.includes('solicitacao') && (
-                <SolicitarTab frota={frota} solicitacoes={solicitacoes} onSubmit={criarSolicitacao} onDelete={excluirSolicitacao} />
+                <SolicitarTab frota={frota} solicitacoes={solicitacoes} onSubmit={criarSolicitacao} onDelete={excluirSolicitacao} role={role} />
               )}
               {view === 'comprador' && allowedTabs.includes('comprador') && (
                 <CompradorTab
@@ -234,7 +277,15 @@ function AppInner() {
                 <RelatorioTab frota={frota} solicitacoes={solicitacoes} config={config} />
               )}
               {view === 'configuracoes' && allowedTabs.includes('configuracoes') && (
-                <ConfiguracoesTab config={config} onConfigChange={atualizarConfig} notify={notify} solicitacoes={solicitacoes} />
+                <ConfiguracoesTab
+                  config={config}
+                  onConfigChange={atualizarConfig}
+                  notify={notify}
+                  solicitacoes={solicitacoes}
+                  permissoes={acessos}
+                  permissoesMeta={permissoesMeta}
+                  onSalvarPermissoes={salvarPermissoes}
+                />
               )}
             </>
           )}
