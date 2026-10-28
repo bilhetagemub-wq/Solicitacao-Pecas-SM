@@ -268,7 +268,7 @@ export default function DashboardTab({ frota, solicitacoes, config, role, onUpda
                         <td><span className="veh-tag">{veiculoLabel(v)}</span></td>
                         <td>{s.peca}</td>
                         <td>{s.quantidade}</td>
-                        <td>mat. {s.matriculaEncarregado}</td>
+                        <td>{s.matriculaEncarregado ? `mat. ${s.matriculaEncarregado}` : '—'}</td>
                         <td>{statusBadge(s.status)}</td>
                         <td className="muted">{s.dataStatus ? fmtDate(s.dataStatus) : '—'}</td>
                         <td><span className={'badge ' + prioridadeBadgeClass(s.prioridade)}>{s.prioridade}</span></td>

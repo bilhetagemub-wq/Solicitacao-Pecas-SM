@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { fmtDate, veiculoLabel } from '../lib/utils';
+import { fmtDate, veiculoLabel, ehEstoqueAlmox, NOME_ESTOQUE_ALMOX } from '../lib/utils';
 import { gerarComprovantePDF } from '../lib/pdfReceipt';
 
 function statusBadge(status) {
@@ -34,12 +34,22 @@ export default function SolicitarTab({ frota, solicitacoes, onSubmit, onDelete, 
     } catch {}
   }, []);
 
-  const veiculoEncontrado = frota.find((v) => v.numeroFrota.toString().trim() === numeroFrota.trim());
+  // O Comprador só solicita para o "veículo" Estoque Almox (sem digitar nada) e não precisa
+  // informar a matrícula do encarregado. Os demais perfis continuam como antes.
+  const ehComprador = role === 'comprador';
+  const veiculoAlmox = frota.find(ehEstoqueAlmox);
+  const veiculoEncontrado = ehComprador
+    ? veiculoAlmox
+    : frota.find((v) => v.numeroFrota.toString().trim() === numeroFrota.trim());
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (!veiculoEncontrado) {
-      setErro('Nº de frota não encontrado. Confira o número ou atualize a frota na aba Atualizações.');
+      setErro(
+        ehComprador
+          ? `O veículo "${NOME_ESTOQUE_ALMOX}" não está cadastrado na frota. Peça a um Gerente ou Developer para incluí-lo na aba Atualizações.`
+          : 'Nº de frota não encontrado. Confira o número ou atualize a frota na aba Atualizações.'
+      );
       return;
     }
     setEnviando(true);
@@ -120,6 +130,18 @@ export default function SolicitarTab({ frota, solicitacoes, onSubmit, onDelete, 
 
       <div className="panel">
         <form onSubmit={handleSubmit}>
+          {ehComprador ? (
+            <div className="field">
+              <label>Veículo</label>
+              <input type="text" value={NOME_ESTOQUE_ALMOX} readOnly disabled style={{ background: '#F5F6F8', fontWeight: 600 }} />
+              {!veiculoAlmox && (
+                <div style={{ marginTop: 7, fontSize: 12.5, color: 'var(--vermelho)', fontWeight: 600 }}>
+                  O veículo "{NOME_ESTOQUE_ALMOX}" não está cadastrado na frota. Peça a um Gerente ou
+                  Developer para incluí-lo na aba Atualizações.
+                </div>
+              )}
+            </div>
+          ) : (
           <div className="field">
             <label>Nº da frota *</label>
             <input
@@ -143,6 +165,7 @@ export default function SolicitarTab({ frota, solicitacoes, onSubmit, onDelete, 
               )}
             </div>
           </div>
+          )}
 
           <div className="field">
             <label>Peça *</label>
@@ -174,8 +197,11 @@ export default function SolicitarTab({ frota, solicitacoes, onSubmit, onDelete, 
           </div>
 
           <div className="field">
-            <label>Matrícula do encarregado *</label>
-            <input type="text" inputMode="numeric" placeholder="Ex: 67890" required value={matEnc} onChange={(e) => setMatEnc(e.target.value)} />
+            <label>
+              Matrícula do encarregado{' '}
+              {ehComprador ? <span className="muted" style={{ fontWeight: 400 }}>(opcional)</span> : '*'}
+            </label>
+            <input type="text" inputMode="numeric" placeholder="Ex: 67890" required={!ehComprador} value={matEnc} onChange={(e) => setMatEnc(e.target.value)} />
           </div>
 
           <div className="field">

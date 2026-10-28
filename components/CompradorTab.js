@@ -119,7 +119,7 @@ export default function CompradorTab({ frota, solicitacoes, config, role, onUpda
                       <td>{s.peca}</td>
                       <td>{s.quantidade}</td>
                       <td>mat. {s.matriculaSolicitante}</td>
-                      <td>mat. {s.matriculaEncarregado}</td>
+                      <td>{s.matriculaEncarregado ? `mat. ${s.matriculaEncarregado}` : '—'}</td>
                       <td>
                         <select
                           value={s.status}
