@@ -5,14 +5,13 @@ import * as XLSX from 'xlsx';
 import { daysSince, fmtDate, veiculoLabel } from '../lib/utils';
 
 export default function RelatorioTab({ frota, solicitacoes, config }) {
-  const [incluirResolvidas, setIncluirResolvidas] = useState(false);
   const [somenteAtrasadas, setSomenteAtrasadas] = useState(false);
 
-  let lista = solicitacoes.filter((s) => {
-    if (s.status !== 'Em Estoque') return true; // pendente/em cotação sempre entram, sujeitas aos outros filtros
-    if (s.instalada === true) return false; // já foi pro veículo — nunca aparece no relatório
-    return incluirResolvidas && s.instalada === false; // só entra se marcada como não instalada e a caixa estiver marcada
-  });
+  // Só duas categorias aparecem aqui: Pendente, e Em Estoque que ainda não foi confirmado
+  // como instalado (aguardando confirmação). Em Cotação e peças já instaladas ficam de fora.
+  let lista = solicitacoes.filter((s) =>
+    s.status === 'Pendente' || (s.status === 'Em Estoque' && s.instalada !== true)
+  );
   if (somenteAtrasadas) {
     lista = lista.filter((s) => s.status !== 'Em Estoque' && daysSince(s.dataSolicitacao) > (config.alertaDias || 7));
   }
@@ -22,9 +21,14 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
     return db_ - da;
   });
 
+  function foiDevolvida(s) {
+    return s.status === 'Pendente' && Boolean(s.motivoNaoInstalada);
+  }
+
   function textoInstalada(s) {
-    if (s.status !== 'Em Estoque') return '';
-    return s.instalada === false ? 'Não' : 'Aguardando confirmação';
+    if (s.status === 'Em Estoque') return 'Aguardando confirmação';
+    if (foiDevolvida(s)) return 'Retornou (não instalada)';
+    return '';
   }
 
   function montarLinha(s) {
@@ -38,13 +42,13 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
       'Peça': s.peca,
       'Quantidade': s.quantidade,
       'Status': s.status,
-      'Instalada no Veículo': textoInstalada(s),
+      'Situação': textoInstalada(s),
       'Prioridade': s.prioridade,
       'Matrícula Solicitante': s.matriculaSolicitante,
       'Matrícula Encarregado': s.matriculaEncarregado,
       'Dias em Aberto': s.status !== 'Em Estoque' ? daysSince(s.dataSolicitacao) : '',
       'Atrasada': atrasada ? 'Sim' : 'Não',
-      'Motivo Não Instalada': s.instalada === false ? (s.motivoNaoInstalada || '') : '',
+      'Motivo Não Instalada (histórico)': s.motivoNaoInstalada || '',
       'Observações': s.observacoes || '',
     };
   }
@@ -74,17 +78,15 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
       <div className="panel">
         <div className="filters">
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 13.5, color: 'var(--texto)' }}>
-            <input type="checkbox" style={{ width: 'auto' }} checked={incluirResolvidas} onChange={(e) => setIncluirResolvidas(e.target.checked)} />
-            Incluir peças em estoque não instaladas
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 13.5, color: 'var(--texto)' }}>
             <input type="checkbox" style={{ width: 'auto' }} checked={somenteAtrasadas} onChange={(e) => setSomenteAtrasadas(e.target.checked)} />
             Mostrar somente atrasadas
           </label>
         </div>
         <p className="muted" style={{ marginTop: -4, marginBottom: 14 }}>
-          Peças já instaladas no veículo nunca aparecem aqui — só as que ainda estão em
-          estoque sem terem ido pro carro (marcadas como "não instalada").
+          Mostra somente peças pendentes e peças já em estoque aguardando confirmação (que
+          ainda não foram pro veículo). Peças em cotação e já instaladas não aparecem aqui.
+          Linhas em destaque (amarelo) são peças que já foram marcadas como "não instalada"
+          e voltaram para pendente — a coluna "Situação" mostra "Retornou (não instalada)".
         </p>
         <p className="muted" style={{ margin: '0 0 14px' }}>{lista.length} solicitação(ões) nesse filtro.</p>
         <button className="btn btn-primary" onClick={baixarExcel} disabled={lista.length === 0}>
@@ -99,13 +101,18 @@ export default function RelatorioTab({ frota, solicitacoes, config }) {
         ) : (
           <>
             <table>
-              <thead><tr><th>Data</th><th>Veículo</th><th>Peça</th><th>Qtd</th><th>Status</th><th>Instalada</th><th>Prioridade</th><th>Tempo</th></tr></thead>
+              <thead><tr><th>Data</th><th>Veículo</th><th>Peça</th><th>Qtd</th><th>Status</th><th>Situação</th><th>Prioridade</th><th>Tempo</th></tr></thead>
               <tbody>
                 {lista.slice(0, 50).map((s) => {
                   const v = frota.find((f) => f.id === s.veiculoId);
                   const atrasada = s.status !== 'Em Estoque' && daysSince(s.dataSolicitacao) > (config.alertaDias || 7);
+                  const devolvida = foiDevolvida(s);
                   return (
-                    <tr key={s.id} className={atrasada ? 'row-alerta' : ''}>
+                    <tr
+                      key={s.id}
+                      className={atrasada ? 'row-alerta' : ''}
+                      style={!atrasada && devolvida ? { background: '#FFF6E0' } : undefined}
+                    >
                       <td className="muted">{s.dataSolicitacao ? fmtDate(s.dataSolicitacao) : '—'}</td>
                       <td><span className="veh-tag">{veiculoLabel(v)}</span></td>
                       <td>{s.peca}</td>

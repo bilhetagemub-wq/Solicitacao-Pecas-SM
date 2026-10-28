@@ -12,7 +12,8 @@ function statusBadge(status) {
 
 const LEMBRETE_KEY = 'sm_ultima_identificacao';
 
-export default function SolicitarTab({ frota, solicitacoes, onSubmit, onDelete }) {
+export default function SolicitarTab({ frota, solicitacoes, onSubmit, onDelete, role }) {
+  const podeExcluir = role !== 'comprador';
   const [numeroFrota, setNumeroFrota] = useState('');
   const [peca, setPeca] = useState('');
   const [qtd, setQtd] = useState(1);
@@ -199,7 +200,7 @@ export default function SolicitarTab({ frota, solicitacoes, onSubmit, onDelete }
           <div className="empty"><h3>Nenhuma solicitação ainda</h3><p>As solicitações enviadas aparecerão aqui.</p></div>
         ) : (
           <table>
-            <thead><tr><th>Data</th><th>Veículo</th><th>Peça</th><th>Qtd</th><th>Matrícula solicitante</th><th>Status</th><th colSpan={2}></th></tr></thead>
+            <thead><tr><th>Data</th><th>Veículo</th><th>Peça</th><th>Qtd</th><th>Matrícula solicitante</th><th>Status</th><th colSpan={podeExcluir ? 2 : 1}></th></tr></thead>
             <tbody>
               {ultimas.map((s) => {
                 const v = frota.find((f) => f.id === s.veiculoId);
@@ -216,14 +217,16 @@ export default function SolicitarTab({ frota, solicitacoes, onSubmit, onDelete }
                         🖨 Comprovante
                       </button>
                     </td>
-                    <td>
-                      <button
-                        className="btn btn-sm btn-danger-ghost"
-                        onClick={() => { if (confirm('Excluir esta solicitação? Essa ação não pode ser desfeita.')) onDelete(s.id); }}
-                      >
-                        Excluir
-                      </button>
-                    </td>
+                    {podeExcluir && (
+                      <td>
+                        <button
+                          className="btn btn-sm btn-danger-ghost"
+                          onClick={() => { if (confirm('Excluir esta solicitação? Essa ação não pode ser desfeita.')) onDelete(s.id); }}
+                        >
+                          Excluir
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
