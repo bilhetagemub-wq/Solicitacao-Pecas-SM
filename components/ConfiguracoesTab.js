@@ -5,8 +5,12 @@ import { collection, onSnapshot, writeBatch, doc } from 'firebase/firestore';
 import { db } from '../lib/firebaseClient';
 import { FUNCOES, FUNCAO_LABEL } from '../lib/roles';
 import { criarUsuario, atualizarFuncaoUsuario, excluirUsuario, testarEmailAlerta } from '../lib/adminApi';
+import PermissoesPanel from './PermissoesPanel';
 
-export default function ConfiguracoesTab({ config, onConfigChange, notify, solicitacoes = [] }) {
+export default function ConfiguracoesTab({
+  config, onConfigChange, notify, solicitacoes = [], permissoes, permissoesMeta, onSalvarPermissoes,
+}) {
+  const [secao, setSecao] = useState('alertas'); // 'alertas' | 'acessos'
   const [emails, setEmails] = useState(config.alertEmails || []);
   const [novoEmail, setNovoEmail] = useState('');
   const [alertaDias, setAlertaDias] = useState(config.alertaDias || 7);
@@ -158,10 +162,37 @@ export default function ConfiguracoesTab({ config, onConfigChange, notify, solic
       <div className="topbar">
         <div>
           <h1>Configurações</h1>
-          <p>Alertas por e-mail e gerenciamento de usuários — acesso restrito a Developer</p>
+          <p>Alertas por e-mail, funções, permissões e usuários — acesso restrito a Developer</p>
         </div>
       </div>
 
+      <div
+        role="tablist"
+        style={{
+          display: 'inline-flex', gap: 4, padding: 4, marginBottom: 20,
+          background: '#fff', border: '1px solid var(--borda)', borderRadius: 10,
+        }}
+      >
+        {[{ id: 'alertas', label: 'Alertas' }, { id: 'acessos', label: 'Funções e usuários' }].map((s) => (
+          <button
+            key={s.id}
+            role="tab"
+            aria-selected={secao === s.id}
+            className="btn btn-sm"
+            onClick={() => setSecao(s.id)}
+            style={{
+              padding: '8px 18px',
+              background: secao === s.id ? 'var(--verde)' : 'transparent',
+              color: secao === s.id ? '#fff' : 'var(--texto-suave)',
+            }}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {secao === 'alertas' && (
+      <>
       <div className="panel">
         <h2>E-mails de alerta</h2>
         <p className="muted" style={{ margin: '0 0 14px' }}>
@@ -251,6 +282,17 @@ export default function ConfiguracoesTab({ config, onConfigChange, notify, solic
           sem precisar esperar o status mudar.
         </p>
       </div>
+      </>
+      )}
+
+      {secao === 'acessos' && (
+      <>
+      <PermissoesPanel
+        permissoes={permissoes}
+        meta={permissoesMeta}
+        usuarios={usuarios}
+        onSalvar={onSalvarPermissoes}
+      />
 
       <div className="panel">
         <h2>Adicionar usuário</h2>
@@ -309,6 +351,8 @@ export default function ConfiguracoesTab({ config, onConfigChange, notify, solic
           </table>
         )}
       </div>
+      </>
+      )}
     </>
   );
 }
